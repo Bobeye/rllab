@@ -67,6 +67,32 @@ class DiagonalGaussian(Distribution):
         return - TT.sum(log_stds, axis=-1) - \
                0.5 * TT.sum(TT.square(zs), axis=-1) - \
                0.5 * means.shape[-1] * np.log(2 * np.pi)
+    
+    def likelihood_ratio_sym_1traj(self, x_var, old_dist_info_vars, new_dist_info_vars):
+        logli_new = self.log_likelihood_sym_1traj(x_var, new_dist_info_vars)
+        logli_old = self.log_likelihood_sym_1traj(x_var, old_dist_info_vars)
+        return TT.exp(logli_new - logli_old)
+
+    def log_likelihood_sym_1traj(self, x_var, dist_info_vars):
+        means = dist_info_vars["mean"]
+        log_stds = dist_info_vars["log_std"]
+        zs = (x_var - means) / TT.exp(log_stds)
+        return TT.sum(- TT.sum(log_stds, axis=-1) - \
+               0.5 * TT.sum(TT.square(zs), axis=-1) - \
+               0.5 * means.shape[-1] * np.log(2 * np.pi))
+    
+    def likelihood_ratio_sym_1traj_GPOMDP(self, x_var, old_dist_info_vars, new_dist_info_vars):
+        logli_new = self.log_likelihood_sym_1traj_GPOMDP(x_var, new_dist_info_vars)
+        logli_old = self.log_likelihood_sym_1traj_GPOMDP(x_var, old_dist_info_vars)
+        return TT.exp(logli_new - logli_old)
+
+    def log_likelihood_sym_1traj_GPOMDP(self, x_var, dist_info_vars):
+        means = dist_info_vars["mean"]
+        log_stds = dist_info_vars["log_std"]
+        zs = (x_var - means) / TT.exp(log_stds)
+        return TT.cumsum(- TT.sum(log_stds, axis=-1) - \
+               0.5 * TT.sum(TT.square(zs), axis=-1) - \
+               0.5 * means.shape[-1] * np.log(2 * np.pi))
 
     def sample(self, dist_info):
         means = dist_info["mean"]
