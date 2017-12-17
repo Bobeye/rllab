@@ -118,6 +118,8 @@ for k in range(10):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_novar.txt'), trainable=True)
         policy.set_param_values(np.loadtxt('policy_novar.txt'), trainable=True)
+    else:
+        policy.set_param_values(snap_policy.get_param_values(trainable=True), trainable=True) 
     avg_return = np.zeros(s_tot)
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
     j=0
@@ -193,13 +195,12 @@ for k in range(10):
             var_is = var_is_sgd/(M)
             m_is = np.mean(s_g_fv_is,axis=0)
             m_sgd = np.mean(s_g_fv_sgd,axis=0)
-            cov= np.outer(s_g_fv_is[0]-m_is,s_g_fv[0]-m_sgd)
+            cov= np.outer(s_g_fv_is[0]-m_is,s_g_fv_sgd[0]-m_sgd)
             for i in range(M-1):
               cov += np.outer(s_g_fv_is[i+1]-m_is,s_g_fv_sgd[i+1]-m_sgd)  
             for i in range(M):
               cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
-            cov = cov/N
-            
+            cov = cov/(M*M)
             var_svrg = var_fg + var_is + var_batch + cov
             var_dif = var_svrg-var_batch
             
@@ -220,24 +221,20 @@ for k in range(10):
 alla_mean = [np.mean(x) for x in zip(*alla)]
 plt.plot(alla_mean)
 plt.show()
-np.savetxt("GPOMDP_SVRG_5e-5_ada_ver2",alla_mean)
+np.savetxt("GPOMDP_SVRG_ada_ver2",alla_mean)
 
 gpomdp = np.loadtxt("GPOMDP_l5e-05")
-#gpomdp_svrg=np.loadtxt("GPOMDP_SVRG_5e-5")
-#gpomdp_svrg_ada=np.loadtxt("GPOMDP_SVRG_5e-5_N_100_ada")
-gpomdp_svrg_ada_wb = np.loadtxt("GPOMDP_SVRG_5e-5_ada_wb")
-#gpomdp_svrg_ada_wb_50 = np.loadtxt("GPOMDP_SVRG_5e-5_N_50_ada_wb")
-gpomdp_svrg_ver2 = np.loadtxt("GPOMDP_SVRG_5e-5_ada_ver2")
-
+gpomdp_svrg_ada_wb = np.loadtxt("GPOMDP_SVRG_5e-5_ada")
+gpomdp_svrg_ver2 = np.loadtxt("GPOMDP_SVRG_ada_ver2")
+gpomdp_svrg_ver3 = np.loadtxt("GPOMDP_SVRG_ada_ver3")
+#
 plt.plot(gpomdp)
-#plt.plot(gpomdp_svrg)
-#plt.plot(gpomdp_svrg_ada[::10])
 plt.plot(gpomdp_svrg_ada_wb[::10])
-#plt.plot(gpomdp_svrg_ada_wb_50[::10])
 plt.plot(gpomdp_svrg_ver2[::10])
-plt.legend(['gpomdp','gpomdp_svrg vers 1','gpomdp_svrg vers 2'], loc='lower right')
+plt.plot(gpomdp_svrg_ver3[::10])
+plt.legend(['gpomdp','gpomdp_svrg vers 1','gpomdp_svrg vers 2','gpomdp_svrg vers 3'], loc='lower right')
 plt.savefig("adapt_divversioni.jpg", figsize=(32, 24), dpi=160)
-##plt.show()
+plt.show()
 #uni = np.ones(640,dtype=np.int)
 #for i in range(40):
 #    uni[i*16]=10
