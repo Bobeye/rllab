@@ -8,11 +8,12 @@ from rllab.sampler import parallel_sampler
 from lasagne.updates import sgd
 from rllab.misc import ext
 from rllab.envs.gym_env import GymEnv
+import pandas as pd
 
 
 import matplotlib.pyplot as plt
 
-load_policy=False
+load_policy=True
 # normalize() makes sure that the actions for the environment lies
 # within the range [-1, 1] (only works for environments with continuous actions)
 env = normalize(GymEnv("LunarLanderContinuous-v2"))
@@ -71,11 +72,13 @@ f_update = theano.function(
     updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 
-alla = []
-for i in range(10):
+alla = {}
+rewards_snapshot_data={}
+for k in range(10):
     if (load_policy):
-        policy.set_param_values(np.loadtxt('policy_novar.txt'), trainable=True)        
+        policy.set_param_values(np.loadtxt('policy_lunar_novar.txt'), trainable=True)        
     avg_return = np.zeros(n_itr)
+    rewards_snapshot=[]
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
     for j in range(n_itr):
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
@@ -99,25 +102,20 @@ for i in range(10):
         
         f_update(s_g[0],s_g[1],s_g[2],s_g[3])
         avg_return[j] = np.mean([sum(p["rewards"]) for p in paths])
+        rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         if (j%10==0):
             print(str(j)+' Average Return:', avg_return[j])
-            
-    plt.plot(avg_return[::10])
-    plt.show()
-    alla.append(avg_return)
-alla_mean = [np.mean(x) for x in zip(*alla)]
-plt.plot(alla_mean)
-np.savetxt("GPOMDP_asda",alla_mean)
+     
+    rewards_snapshot_data["rewardsSnapshot"+str(k)]= rewards_snapshot    
+#    plt.plot(avg_return[::10])
+#    plt.show()
+    alla["avgReturn"+str(k)]=avg_return
 
-obs = env.reset()
-done=0
-i=0
-rcum= 0
-while not done:
-    ac = policy.get_action(obs)
-    obs,rew,done,info = env.step(ac[0])
-    rcum += rew
-    env.render()
-    i+=1
+
+alla = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alla.items() ]))
+rewards_snapshot_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rewards_snapshot_data.items() ]))
+
+rewards_snapshot_data.to_csv("rewards_snapshot_GPOMDP_lunar.csv",index=False)
+alla.to_csv("GPOMDP_SVRG_adaptive_GPOMDP_lunar.csv",index=False)
     
     
