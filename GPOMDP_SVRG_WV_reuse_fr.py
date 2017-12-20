@@ -181,7 +181,6 @@ var_SVRG = theano.function(
 
 
 
-alla = {}
 variance_svrg_data={}
 variance_sgd_data={}
 importance_weights_data={}
@@ -299,8 +298,6 @@ for k in range(10):
 	avg_return=np.array(avg_return)
 	#plt.plot(avg_return)
 	#plt.show()
-	alla["avgReturn"+str(k)]=avg_return
-alla = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alla.items() ]))
 rewards_snapshot_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rewards_snapshot_data.items() ]))
 n_sub_iter_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in n_sub_iter_data.items() ]))
 variance_sgd_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_sgd_data.items() ]))
@@ -312,5 +309,3 @@ n_sub_iter_data.to_csv("n_sub_iter_reuse.csv",index=False)
 variance_sgd_data.to_csv("variance_sgd_reuse.csv",index=False)
 variance_svrg_data.to_csv("variance_svrg_reuse.csv",index=False)
 importance_weights_data.to_csv("importance_weights_reuse.csv",index=False)
-
-alla.to_csv("GPOMDP_SVRG_adaptive_reuse.csv",index=False)
