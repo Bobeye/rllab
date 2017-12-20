@@ -49,7 +49,8 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.995
 # Learning rate for the gradient update
-learning_rate = 0.00005
+#learning_rate = 0.00005
+learning_rate = 0.1
 
 s_tot = 10000
 

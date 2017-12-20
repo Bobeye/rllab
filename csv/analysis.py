@@ -6,12 +6,12 @@ def flatten(l): return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if
 
 #load the data
 
-n_sub_iter=pd.read_csv("n_sub_iter_v3.csv")
-rewards_snapshot=pd.read_csv("rewards_snapshot_v3.csv")
-rewards_subiter=pd.read_csv("rewards_subiter_v3.csv")
-variance_sgd=pd.read_csv("variance_sgd_v3.csv")
-variance_svrg=pd.read_csv("variance_svrg_v3.csv")
-importance_weights=pd.read_csv("importance_weights_v3.csv")
+n_sub_iter=pd.read_csv("n_sub_iter_reuse.csv")
+rewards_snapshot=pd.read_csv("rewards_snapshot_reuse.csv")
+rewards_subiter=pd.read_csv("rewards_subiter_reuse.csv")
+variance_sgd=pd.read_csv("variance_sgd_reuse.csv")
+variance_svrg=pd.read_csv("variance_svrg_reuse.csv")
+importance_weights=pd.read_csv("importance_weights_reuse.csv")
 gpomdp_rewards=pd.read_csv("GPOMDP_rewards.csv")
 
 #analize

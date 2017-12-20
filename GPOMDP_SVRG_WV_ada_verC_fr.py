@@ -49,7 +49,7 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.00005
+learning_rate = 0.0001
 
 s_tot = 10000
 
@@ -209,11 +209,13 @@ for k in range(10):
             iw_var = f_importance_weights(observations[0], actions[0])
             s_g_fg_c = f_full_g(observations[0], actions[0], d_rewards[0],iw_var)
             s_g_fv_fg = [unpack(s_g_fg_c)]
+            importance_weights.append(np.mean(iw_var))
             for ob,ac,rw in zip(observations[1:],actions[1:],d_rewards[1:]):
                 iw_var = f_importance_weights(ob, ac)
                 s_g_fg = f_full_g(ob, ac, rw,iw_var)
                 s_g_fg_c = [sum(x) for x in zip(s_g_fg_c,s_g_fg)] 
                 s_g_fv_fg.append(unpack(s_g_fg))
+                importance_weights.append(np.mean(iw_var))
             s_g_fg_c  = [x/len(paths) for x in s_g_fg_c]
             var_4_fg = np.cov(s_g_fv_fg,rowvar=False)
             var_fg = var_4_fg/(N)

@@ -31,7 +31,7 @@ n_itr = 1000
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.00005
+learning_rate = 0.0001
 
 observations_var = env.observation_space.new_tensor_variable(
 	'observations',

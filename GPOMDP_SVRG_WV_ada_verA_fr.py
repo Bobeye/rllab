@@ -49,7 +49,7 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.00005
+learning_rate = 0.0001
 
 s_tot = 10000
 
@@ -192,6 +192,7 @@ for k in range(10):
             iw_var = f_importance_weights(sub_observations[0], sub_actions[0])
             s_g_is = f_imp_SVRG(sub_observations[0], sub_actions[0], sub_d_rewards[0],iw_var)
             s_g_fv_is = [unpack(s_g_is)]
+            importance_weights.append(np.mean(iw_var))
             for ob,ac,rw in zip(sub_observations[1:],sub_actions[1:],sub_d_rewards[1:]):
                 i_g_sgd = f_train(ob, ac, rw)
                 s_g_fv_sgd.append(unpack(i_g_sgd))
@@ -200,6 +201,7 @@ for k in range(10):
                 s_g_is_sgd = f_imp_SVRG(ob, ac, rw,iw_var)
                 s_g_fv_is.append(unpack(s_g_is_sgd))
                 s_g_is = [sum(x) for x in zip(s_g_is,s_g_is_sgd)] 
+                importance_weights.append(np.mean(iw_var))
             s_g_is = [x/len(sub_paths) for x in s_g_is]
             s_g_sgd = [x/len(sub_paths) for x in s_g_sgd]
             var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
@@ -216,8 +218,6 @@ for k in range(10):
             cov = cov/(M*M)
             var_svrg = var_fg + var_is + var_batch + cov
             var_dif = var_svrg-var_batch
-            iw = f_importance_weights(sub_observations[0],sub_actions[0])
-            importance_weights.append(np.mean(iw))
             variance_svrg.append((np.diag(var_svrg).sum()))
             variance_sgd.append((np.diag(var_batch).sum()))
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in sub_paths]))

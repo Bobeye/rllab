@@ -85,7 +85,7 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.00005
+learning_rate = 0.0001
 #perc estimate
 perc_est = 0.6
 #tot trajectories

@@ -6,6 +6,7 @@ import theano
 import theano.tensor as TT
 from rllab.sampler import parallel_sampler
 from lasagne.updates import sgd
+from lasagne.updates import adam
 from rllab.misc import ext
 from rllab.envs.gym_env import GymEnv
 import pandas as pd
