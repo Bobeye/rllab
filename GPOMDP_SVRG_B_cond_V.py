@@ -18,42 +18,6 @@ def unpack(i_g):
 	res = np.concatenate((res,i_g_arr[3]))
 	return res
 
-
-def compute_snap_batch(observations,actions,d_rewards,n_traj,n_part):
-	n=n_traj
-	i=0
-	svrg_snap=list()
-	while(n-np.int(n_traj/n_part)>=0):
-		n=n-np.int(n_traj/n_part)
-		s_g = f_train(observations[i], actions[i], d_rewards[i])
-		for s in range(i+1,i+np.int(n_traj/n_part)):
-			s_g = [sum(x) for x in zip(s_g,f_train(observations[s], actions[s], d_rewards[s]))]
-		s_g = [x/np.int(n_traj/n_part) for x in s_g]
-		i += np.int(n_traj/n_part)
-		svrg_snap.append(unpack(s_g))
-	return svrg_snap
-
-def estimate_variance(observations,actions,d_rewards,snap_grads,n_traj,n_traj_s,n_part,M,N):
-	n=n_traj
-	i=0
-	svrg=list()
-	j=0
-	while(n-np.int(n_traj/n_part)>=0):
-		n=n-np.int(n_traj/n_part)
-		iw = f_importance_weights(observations[i],actions[i])
-		x = unpack(f_train_SVRG_4v(observations[i],actions[i],d_rewards[i],iw))*np.sqrt(np.int(n_traj/n_part)/M)
-		g = snap_grads[j]*np.sqrt(np.int(n_traj_s/n_part)/N)+x
-		for s in range(i+1,i+np.int(n_traj/n_part)):
-			iw = f_importance_weights(observations[s],actions[s])
-			g_prov=unpack(f_train_SVRG_4v(observations[s],actions[s],d_rewards[s],iw))*np.sqrt(np.int(n_traj/n_part)/M)
-			g+=snap_grads[j]*np.sqrt(np.int((n_traj_s)/n_part)/N) + g_prov
-		g=g/n_traj*n_part
-		i+=np.int(n_traj/n_part)
-		j+=1
-		svrg.append(g)
-	return (np.diag(np.cov(np.matrix(svrg),rowvar=False)).sum())
-
-
 def estimate_full_gradient_var(data):
 	var_4_fg = np.cov(data,rowvar=False)
 	var_fg = var_4_fg/(N)
