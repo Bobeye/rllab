@@ -18,19 +18,66 @@ def unpack(i_g):
 	res = np.concatenate((res,i_g_arr[3]))
 	return res
 
+<<<<<<< Updated upstream
+=======
+
+def compute_snap_batch(observations,actions,d_rewards,n_traj,n_part):
+	n=n_traj
+	i=0
+	svrg_snap=list()
+	while(n-np.int(n_traj/n_part)>=0):
+		n=n-np.int(n_traj/n_part)
+		s_g = f_train(observations[i], actions[i], d_rewards[i])
+		for s in range(i+1,i+np.int(n_traj/n_part)):
+			s_g = [sum(x) for x in zip(s_g,f_train(observations[s], actions[s], d_rewards[s]))]
+		s_g = [x/np.int(n_traj/n_part) for x in s_g]
+		i += np.int(n_traj/n_part)
+		svrg_snap.append(unpack(s_g))
+	return svrg_snap
+
+def estimate_variance(observations,actions,d_rewards,snap_grads,n_traj,n_traj_s,n_part,M,N):
+	n=n_traj
+	i=0
+	svrg=list()
+	j=0
+	while(n-np.int(n_traj/n_part)>=0):
+		n=n-np.int(n_traj/n_part)
+		iw = f_importance_weights(observations[i],actions[i])
+		x = unpack(f_train_SVRG_4v(observations[i],actions[i],d_rewards[i],iw))*np.sqrt(np.int(n_traj/n_part)/M)
+		g = snap_grads[j]*np.sqrt(np.int(n_traj_s/n_part)/N)+x
+		for s in range(i+1,i+np.int(n_traj/n_part)):
+			iw = f_importance_weights(observations[s],actions[s])
+			g_prov=unpack(f_train_SVRG_4v(observations[s],actions[s],d_rewards[s],iw))*np.sqrt(np.int(n_traj/n_part)/M)
+			g+=snap_grads[j]*np.sqrt(np.int((n_traj_s)/n_part)/N) + g_prov
+		g=g/n_traj*n_part
+		i+=np.int(n_traj/n_part)
+		j+=1
+		svrg.append(g)
+	return (np.diag(np.cov(np.matrix(svrg),rowvar=False)).sum())
+
+
+>>>>>>> Stashed changes
 def estimate_full_gradient_var(data):
 	var_4_fg = np.cov(data,rowvar=False)
 	var_fg = var_4_fg/(N)
 	return var_fg
 	
 def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
+<<<<<<< Updated upstream
 	s_g_sgd = [-x for x in f_train(observations[0], actions[0], d_rewards[0])]
+=======
+	s_g_sgd = f_train(observations[0], actions[0], d_rewards[0])
+>>>>>>> Stashed changes
 	s_g_fv_sgd = [unpack(s_g_sgd)]
 	iw_var = f_importance_weights(observations[0],actions[0])
 	s_g_is = var_SVRG(observations[0], actions[0], d_rewards[0],iw_var)
 	s_g_fv_is = [unpack(s_g_is)]
 	for ob,ac,rw in zip(observations[1:],actions[1:],d_rewards[1:]):
+<<<<<<< Updated upstream
 		i_g_sgd = [-x for x in f_train(ob, ac, rw)]
+=======
+		i_g_sgd = f_train(ob, ac, rw)
+>>>>>>> Stashed changes
 		s_g_fv_sgd.append(unpack(i_g_sgd))
 		iw_var = f_importance_weights(ob, ac)
 		s_g_is = var_SVRG(ob, ac, rw,iw_var)
@@ -38,11 +85,15 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
 
 	var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
 	var_batch = var_sgd/(M)
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 	var_is_sgd = np.cov(s_g_fv_is,rowvar=False)
 	var_is = var_is_sgd/(M)
 	m_is = np.mean(s_g_fv_is,axis=0)
 	m_sgd = np.mean(s_g_fv_sgd,axis=0)
+<<<<<<< Updated upstream
 	l=len(observations)
 	cov= np.outer(s_g_fv_is[0]-m_is,s_g_fv_sgd[0]-m_sgd)
 	for i in range(l-1):
@@ -51,6 +102,16 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
 	  cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
 	cov = cov/(l*M)
 	var_svrg = var_fg + var_is + var_batch + cov
+=======
+	cov= np.outer(s_g_fv_is[0]-m_is,s_g_fv_sgd[0]-m_sgd)
+	for i in range(M-1):
+	  cov += np.outer(s_g_fv_is[i+1]-m_is,s_g_fv_sgd[i+1]-m_sgd)  
+	for i in range(M):
+	  cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
+	cov = cov/(M*M)
+	var_svrg = var_fg + var_is + var_batch - cov
+	print("condition: "+str(np.trace(var_fg))+" "+str(np.trace(var_is))+" "+str(np.trace(var_batch))+" "+str(np.trace(cov)))
+>>>>>>> Stashed changes
 	return var_svrg,var_batch
 
 	
@@ -85,7 +146,11 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
+<<<<<<< Updated upstream
 learning_rate = 0.01
+=======
+learning_rate = 0.1
+>>>>>>> Stashed changes
 #perc estimate
 perc_est = 0.6
 #tot trajectories
@@ -225,7 +290,11 @@ for k in range(10):
 			s_g = [sum(x) for x in zip(s_g,i_g)]
 		s_g = [x/len(paths) for x in s_g]
 		
+<<<<<<< Updated upstream
 		full_g_variance=estimate_full_gradient_var(s_g_fv)
+=======
+		full_g_variance=estimate_full_gradient_var(s_g_fv[0:np.int(perc_est*N)])
+>>>>>>> Stashed changes
 
 		f_update(s_g[0],s_g[1],s_g[2],s_g[3])
 		rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
@@ -273,14 +342,20 @@ for k in range(10):
 			n_sub+=1
 			
 			iw = f_importance_weights(sub_observations[0],sub_actions[0])
+<<<<<<< Updated upstream
 			iw[iw>1.5]=1.5
+=======
+>>>>>>> Stashed changes
 			importance_weights.append(np.mean(iw))
 			back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
 			
 			g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],iw)
 			for ob,ac,rw in zip(sub_observations[1:],sub_actions[1:],sub_d_rewards[1:]):
 				iw = f_importance_weights(ob,ac)
+<<<<<<< Updated upstream
 				iw[iw>1.5]=1.5
+=======
+>>>>>>> Stashed changes
 				importance_weights.append(np.mean(iw))
 				g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],iw))]
 			g = [x/len(sub_paths) for x in g]
@@ -313,9 +388,18 @@ variance_sgd_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_sgd
 variance_svrg_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_svrg_data.items() ]))
 importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in importance_weights_data.items() ]))
 
+<<<<<<< Updated upstream
 rewards_subiter_data.to_csv("rewards_subiter_Adam_trunc15.csv",index=False)
 rewards_snapshot_data.to_csv("rewards_snapshot_Adam_trunc15.csv",index=False)
 n_sub_iter_data.to_csv("n_sub_iter_Adam_trunc15.csv",index=False)
 variance_sgd_data.to_csv("variance_sgd_Adam_trunc15.csv",index=False)
 variance_svrg_data.to_csv("variance_svrg_Adam_trunc15.csv",index=False)
 importance_weights_data.to_csv("importance_weights_Adam_trunc15.csv",index=False)
+=======
+rewards_subiter_data.to_csv("rewards_subiter_adam.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_adam.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_adam1.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_adam.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_adam.csv",index=False)
+importance_weights_data.to_csv("importance_weights_adam.csv",index=False)
+>>>>>>> Stashed changes

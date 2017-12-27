@@ -5,7 +5,7 @@ import numpy as np
 import theano
 import theano.tensor as TT
 from rllab.sampler import parallel_sampler
-from lasagne.updates import sgd
+from lasagne.updates import adam
 import matplotlib.pyplot as plt
 from rllab.envs.gym_env import GymEnv
 
@@ -97,7 +97,7 @@ f_train = theano.function(
 f_update = theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
     outputs = None,
-    updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 f_importance_weights = theano.function(
     inputs = [observations_var, actions_var],
@@ -107,7 +107,7 @@ f_importance_weights = theano.function(
 f_update_SVRG = theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
     outputs = None,
-    updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 
 f_train_SVRG = theano.function(
