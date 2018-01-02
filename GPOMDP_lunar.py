@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
 # within the range [-1, 1] (only works for environments with continuous actions)
-env = normalize(GymEnv("LunarLanderContinuous-v2"))
+env = normalize(GymEnv("MountainCarContinuous-v0"))
 # Initialize a neural network policy with a single hidden layer of 8 hidden units
 policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=False)
 parallel_sampler.populate_task(env, policy)
@@ -36,7 +36,7 @@ n_itr = 1000
 # Set the discount factor for the problem
 discount = 0.995
 # Learning rate for the gradient update
-learning_rate = 0.00005
+learning_rate = 0.005
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -70,14 +70,14 @@ f_train = theano.function(
 f_update = theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
     outputs = None,
-    updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 
 alla = {}
 rewards_snapshot_data={}
 for k in range(10):
     if (load_policy):
-        policy.set_param_values(np.loadtxt('policy_lunar_novar.txt'), trainable=True)        
+        policy.set_param_values(np.loadtxt('policy_mountain_novar.txt'), trainable=True)        
     avg_return = np.zeros(n_itr)
     rewards_snapshot=[]
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
@@ -104,8 +104,7 @@ for k in range(10):
         f_update(s_g[0],s_g[1],s_g[2],s_g[3])
         avg_return[j] = np.mean([sum(p["rewards"]) for p in paths])
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
-        if (j%10==0):
-            print(str(j)+' Average Return:', avg_return[j])
+        print(str(j)+' Average Return:', avg_return[j])
      
     rewards_snapshot_data["rewardsSnapshot"+str(k)]= rewards_snapshot    
 #    plt.plot(avg_return[::10])
@@ -116,7 +115,7 @@ for k in range(10):
 alla = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alla.items() ]))
 rewards_snapshot_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rewards_snapshot_data.items() ]))
 
-rewards_snapshot_data.to_csv("rewards_snapshot_GPOMDP_lunar.csv",index=False)
-alla.to_csv("GPOMDP_SVRG_adaptive_GPOMDP_lunar.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_GPOMDP_mountain_sgd.csv",index=False)
+alla.to_csv("GPOMDP_SVRG_adaptive_GPOMDP_mountain_sgd.csv",index=False)
     
     
