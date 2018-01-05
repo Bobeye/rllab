@@ -1,5 +1,6 @@
 from rllab.envs.box2d.cartpole_env import CartpoleEnv
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
+from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv
 from rllab.envs.normalized_env import normalize
 import numpy as np
 import theano
@@ -17,9 +18,9 @@ import matplotlib.pyplot as plt
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
 # within the range [-1, 1] (only works for environments with continuous actions)
-env = normalize(GymEnv("MountainCarContinuous-v0"))
+env = normalize(GymEnv("Swimmer-v1"))
 # Initialize a neural network policy with a single hidden layer of 8 hidden units
-policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=False)
+policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
 parallel_sampler.populate_task(env, policy)
 
 # policy.distribution returns a distribution object under rllab.distributions. It contains many utilities for computing
@@ -32,11 +33,11 @@ N = 10
 # Each trajectory will have at most 100 time steps
 T = 1000
 # Number of iterations
-n_itr = 1000
+n_itr = 2000
 # Set the discount factor for the problem
 discount = 0.995
 # Learning rate for the gradient update
-learning_rate = 0.005
+learning_rate = 0.001
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -62,22 +63,25 @@ eval_grad1 = TT.matrix('eval_grad0',dtype=grad[0].dtype)
 eval_grad2 = TT.vector('eval_grad1',dtype=grad[1].dtype)
 eval_grad3 = TT.matrix('eval_grad3',dtype=grad[2].dtype)
 eval_grad4 = TT.vector('eval_grad4',dtype=grad[3].dtype)
+eval_grad5 = TT.matrix('eval_grad5',dtype=grad[3].dtype)
+eval_grad6 = TT.vector('eval_grad5',dtype=grad[3].dtype)
+eval_grad7 = TT.vector('eval_grad5',dtype=grad[3].dtype)
 
 f_train = theano.function(
     inputs = [observations_var, actions_var, d_rewards_var],
     outputs = grad
 )
 f_update = theano.function(
-    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
     outputs = None,
-    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], params, learning_rate=learning_rate)
 )
 
 alla = {}
 rewards_snapshot_data={}
 for k in range(10):
     if (load_policy):
-        policy.set_param_values(np.loadtxt('policy_mountain_novar.txt'), trainable=True)        
+        policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)        
     avg_return = np.zeros(n_itr)
     rewards_snapshot=[]
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
@@ -101,7 +105,7 @@ for k in range(10):
             s_g = [sum(x) for x in zip(s_g,f_train(ob, ac, rw))]
         s_g = [x/len(paths) for x in s_g]
         
-        f_update(s_g[0],s_g[1],s_g[2],s_g[3])
+        f_update(s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6])
         avg_return[j] = np.mean([sum(p["rewards"]) for p in paths])
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         print(str(j)+' Average Return:', avg_return[j])
@@ -117,5 +121,16 @@ rewards_snapshot_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rewards_
 
 rewards_snapshot_data.to_csv("rewards_snapshot_GPOMDP_mountain_sgd.csv",index=False)
 alla.to_csv("GPOMDP_SVRG_adaptive_GPOMDP_mountain_sgd.csv",index=False)
+
+#
+#obs = env.reset()
+#env.render()
+#done = False
+#i=0
+#while not done and i<100:
+#    i +=1
+#    act = policy.get_action(obs)
+#    obs, rw, done, info = env.step(act[0])
+#    env.render()
     
     
