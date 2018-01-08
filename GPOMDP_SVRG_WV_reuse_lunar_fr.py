@@ -90,7 +90,7 @@ learning_rate = 0.001
 #perc estimate
 perc_est = 0.6
 #tot trajectories
-s_tot = 10000
+s_tot = 20000
 
 partition = 3
 
@@ -135,8 +135,9 @@ eval_grad7 = TT.vector('eval_grad5',dtype=grad[3].dtype)
 
 surr_on1 = TT.sum(- dist.log_likelihood_sym_1traj_GPOMDP(actions_var,dist_info_vars)*d_rewards_var*importance_weights_var)
 surr_on2 = TT.sum(snap_dist.log_likelihood_sym_1traj_GPOMDP(actions_var,snap_dist_info_vars)*d_rewards_var)
-grad_SVRG =[sum(x) for x in zip([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
+grad_SVRG =[sum(x) for x in zip([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], theano.grad(surr_on2,snap_params))] #,theano.grad(surr_on1,params))]
 grad_SVRG_4v = [sum(x) for x in zip(theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
+grad_imp = theano.grad(surr_on1,params)
 grad_var = theano.grad(surr_on1,params)
 
 f_train = theano.function(
@@ -165,7 +166,7 @@ f_update_SVRG = theano.function(
 
 
 f_train_SVRG = theano.function(
-    inputs=[observations_var, actions_var, d_rewards_var, eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7,importance_weights_var],
+    inputs=[observations_var, actions_var, d_rewards_var, eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
     outputs=grad_SVRG,
 )
 
@@ -183,6 +184,11 @@ var_SVRG = theano.function(
     outputs=grad_var,
 )
 
+f_train_imp = theano.function(
+    inputs=[observations_var, actions_var, d_rewards_var, importance_weights_var],
+    outputs=grad_var,
+)
+
 
 
 alla = {}
@@ -192,7 +198,7 @@ importance_weights_data={}
 rewards_snapshot_data={}
 n_sub_iter_data={}
 rewards_subiter_data={}
-parallel_sampler.initialize(8)
+parallel_sampler.initialize(4)
 for k in range(10):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
@@ -279,21 +285,24 @@ for k in range(10):
             iw = f_importance_weights(sub_observations[0],sub_actions[0])
             importance_weights.append(np.mean(iw))
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
-            w_cum=np.max(iw)
-            g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6],iw)
+            iw_cum = np.max(iw)
+            g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6])
+            g_is = f_train_imp(sub_observations[0],sub_actions[0],sub_d_rewards[0],iw)
             for ob,ac,rw in zip(sub_observations[1:],sub_actions[1:],sub_d_rewards[1:]):
                 iw = f_importance_weights(ob,ac)
+                iw_cum += np.max(iw)
                 importance_weights.append(np.mean(iw))
-                w_cum+=np.max(iw)
-                g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6],iw))]
-            g = [x/w_cum for x in g] #len(sub_paths)
-            f_update(g[0],g[1],g[2],g[3],g[4],g[5],g[6])
-
+                g_is = [sum(x) for x in zip(g_is,f_train_imp(ob,ac,rw,iw))]
+                g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6]))]
+            g = [x/len(sub_paths) for x in g]
+            g_is = [x/iw_cum for x in g_is]
+            g_d = [sum(x) for x in zip(g_is,g)]  
+            f_update(g_d[0],g_d[1],g_d[2],g_d[3],g_d[4],g_d[5],g_d[6])
             p=snap_policy.get_param_values(trainable=True)
-            s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),10,T,show_bar=False)
-            rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
+#            s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),10,T,show_bar=False)
+ #           rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
             snap_policy.set_param_values(p,trainable=True)
-            print(str(k)+' Average Return:', np.mean([sum(p["rewards"]) for p in s_p]))
+            print('sub iteration')
         n_sub_iter.append(n_sub)
         snap_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True)    
         

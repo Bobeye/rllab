@@ -5,7 +5,7 @@ import numpy as np
 import theano
 import theano.tensor as TT
 from rllab.sampler import parallel_sampler
-from lasagne.updates import adam
+from lasagne.updates import sgd
 import matplotlib.pyplot as plt
 from rllab.envs.gym_env import GymEnv
 import pandas as pd
@@ -66,17 +66,18 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
     iw_var = f_importance_weights(observations[0],actions[0])
     s_g_is = var_SVRG(observations[0], actions[0], d_rewards[0],iw_var)
     s_g_fv_is = [unpack(s_g_is)]
+    w_cum=np.sum(dis_iw(iw_var))
     for ob,ac,rw in zip(observations[1:],actions[1:],d_rewards[1:]):
         i_g_sgd = [-x for x in f_train(ob, ac, rw)]
         s_g_fv_sgd.append(unpack(i_g_sgd))
         iw_var = f_importance_weights(ob, ac)
         s_g_is = var_SVRG(ob, ac, rw,iw_var)
         s_g_fv_is.append(unpack(s_g_is))
-
+        w_cum+=np.sum(dis_iw(iw_var))
     var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
     var_batch = var_sgd/(M)
     var_is_sgd = np.cov(s_g_fv_is,rowvar=False)
-    var_is = var_is_sgd/(M)
+    var_is = var_is_sgd/(w_cum)
     m_is = np.mean(s_g_fv_is,axis=0)
     m_sgd = np.mean(s_g_fv_sgd,axis=0)
     l=len(observations)
@@ -85,11 +86,18 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
       cov += np.outer(s_g_fv_is[i+1]-m_is,s_g_fv_sgd[i+1]-m_sgd)  
     for i in range(l):
       cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
-    cov = cov/(l*M)
+    cov = cov/(l*np.sqrt(M*w_cum))
     var_svrg = var_fg + var_is + var_batch + cov
     return var_svrg,var_batch
 
-    
+ 
+def dis_iw(iw):
+    z=list()
+    t=1
+    for y in iw:
+        z.append(y*t)
+        t*=discount
+    return np.array(z)
     
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
@@ -121,7 +129,7 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.1
+learning_rate = 0.00005
 #perc estimate
 perc_est = 0.6
 #tot trajectories
@@ -166,8 +174,9 @@ eval_grad4 = TT.vector('eval_grad4',dtype=grad[3].dtype)
 
 surr_on1 = TT.sum(- dist.log_likelihood_sym_1traj_GPOMDP(actions_var,dist_info_vars)*d_rewards_var*importance_weights_var)
 surr_on2 = TT.sum(snap_dist.log_likelihood_sym_1traj_GPOMDP(actions_var,snap_dist_info_vars)*d_rewards_var)
-grad_SVRG =[sum(x) for x in zip([eval_grad1, eval_grad2, eval_grad3, eval_grad4], theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
+grad_SVRG =theano.grad(surr_on2,snap_params) #,theano.grad(surr_on1,params))]
 grad_SVRG_4v = [sum(x) for x in zip(theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
+grad_imp = theano.grad(surr_on1,params)
 grad_var = theano.grad(surr_on1,params)
 
 f_train = theano.function(
@@ -178,7 +187,7 @@ f_train = theano.function(
 f_update = theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
     outputs = None,
-    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 f_importance_weights = theano.function(
     inputs = [observations_var, actions_var],
@@ -190,13 +199,14 @@ f_importance_weights = theano.function(
 f_update_SVRG = theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
     outputs = None,
-    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 
 
 
+
 f_train_SVRG = theano.function(
-    inputs=[observations_var, actions_var, d_rewards_var, eval_grad1, eval_grad2, eval_grad3, eval_grad4,importance_weights_var],
+    inputs=[observations_var, actions_var, d_rewards_var],
     outputs=grad_SVRG,
 )
 
@@ -214,6 +224,11 @@ var_SVRG = theano.function(
     outputs=grad_var,
 )
 
+f_train_imp = theano.function(
+    inputs=[observations_var, actions_var, d_rewards_var, importance_weights_var],
+    outputs=grad_var,
+)
+
 
 
 variance_svrg_data={}
@@ -222,7 +237,7 @@ importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
 n_sub_iter_data={}
-
+parallel_sampler.initialize(3)
 for k in range(10):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_novar.txt'), trainable=True)
@@ -309,18 +324,22 @@ for k in range(10):
             n_sub+=1
             
             iw = f_importance_weights(sub_observations[0],sub_actions[0])
-            iw[iw>1.5]=1.5
+            iw_cum=np.sum(dis_iw(iw))
             importance_weights.append(np.mean(iw))
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
             
-            g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],iw)
+            g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0])
+            g_is = f_train_imp(sub_observations[0],sub_actions[0],sub_d_rewards[0],iw)
             for ob,ac,rw in zip(sub_observations[1:],sub_actions[1:],sub_d_rewards[1:]):
                 iw = f_importance_weights(ob,ac)
-                iw[iw>1.5]=1.5
+                iw_cum += np.sum(dis_iw(iw))
                 importance_weights.append(np.mean(iw))
-                g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],iw))]
+                g_is = [sum(x) for x in zip(g_is,f_train_imp(ob,ac,rw,iw))]
+                g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw))]
             g = [x/len(sub_paths) for x in g]
-            f_update(g[0],g[1],g[2],g[3])
+            g_is = [x/iw_cum for x in g_is]
+            g_d = [sum(x) for x in zip(g_is,g,s_g)]  
+            f_update(g_d[0],g_d[1],g_d[2],g_d[3])
 
             p=snap_policy.get_param_values(trainable=True)
             s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),10,T,show_bar=False)

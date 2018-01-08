@@ -6,6 +6,7 @@ import theano
 import theano.tensor as TT
 from rllab.sampler import parallel_sampler
 from lasagne.updates import sgd
+from lasagne.updates import adam
 from rllab.misc import ext
 import pandas as pd
 
@@ -31,7 +32,7 @@ n_itr = 1000
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.0001
+learning_rate = 0.01
 
 observations_var = env.observation_space.new_tensor_variable(
 	'observations',
@@ -65,9 +66,10 @@ f_train = theano.function(
 f_update = theano.function(
 	inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
 	outputs = None,
-	updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+	updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 runs_rewards = {}
+parallel_sampler.initialize(3)
 for k in range(10):
 	if (load_policy):
 		policy.set_param_values(np.loadtxt('policy_novar.txt'), trainable=True)
