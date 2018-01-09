@@ -242,7 +242,7 @@ importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
 n_sub_iter_data={}
-parallel_sampler.initialize(1)
+parallel_sampler.initialize(15)
 for k in range(10):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
@@ -260,6 +260,7 @@ for k in range(10):
     while j<s_tot-N:
         paths = parallel_sampler.sample_paths_on_trajectories(snap_policy.get_param_values(),N,T,show_bar=False)
         #baseline.fit(paths)
+        paths = paths[:N]
         j+=N
         observations = [p["observations"] for p in paths]
         actions = [p["actions"] for p in paths]
@@ -300,6 +301,7 @@ for k in range(10):
             j += M
             sub_paths = parallel_sampler.sample_paths_on_trajectories(snap_policy.get_param_values(),M,T,show_bar=False)
             #baseline.fit(paths)
+            sub_paths = sub_paths[:M]
             sub_observations=[p["observations"] for p in sub_paths]
             sub_actions = [p["actions"] for p in sub_paths]
             sub_d_rewards = [p["rewards"] for p in sub_paths]
@@ -318,6 +320,7 @@ for k in range(10):
             var_svrg,var_batch=estimate_SVRG_and_SGD_var(sub_ob_acc,sub_ac_acc,sub_d_rew_acc,full_g_variance)
             var_dif = var_svrg-var_batch
             s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),10,T,show_bar=False)
+            s_p = s_p[:M]
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
             avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
             print(str(j-1)+' Average Return:', avg_return[-1])
