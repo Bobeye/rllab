@@ -320,19 +320,20 @@ for k in range(10):
             s_p = s_p[:M]
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
             avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
+            n_sub+=1
+            variance_svrg.append(np.trace(var_svrg))
+            variance_sgd.append(np.trace(var_batch))
+            iw = f_importance_weights(sub_observations[0],sub_actions[0])
+            iw_cum=np.sum(dis_iw(iw))
+            importance_weights.append(np.mean(iw))
             #eigval = np.real(np.linalg.eig(var_dif)[0])
             if (np.trace(var_dif)>0):
                 policy.set_param_values(back_up_policy.get_param_values(trainable=True), trainable=True)
                 break
-            variance_svrg.append(np.trace(var_svrg))
-            variance_sgd.append(np.trace(var_batch))
 
             #print(np.sum(eigval))
-            n_sub+=1
             
-            iw = f_importance_weights(sub_observations[0],sub_actions[0])
-            iw_cum=np.sum(dis_iw(iw))
-            importance_weights.append(np.mean(iw))
+            
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
             
             g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0])
