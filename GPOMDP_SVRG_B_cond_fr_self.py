@@ -5,7 +5,7 @@ import numpy as np
 import theano
 import theano.tensor as TT
 from rllab.sampler import parallel_sampler
-from lasagne.updates import sgd
+from lasagne.updates import adam
 import matplotlib.pyplot as plt
 from rllab.envs.gym_env import GymEnv
 import pandas as pd
@@ -74,6 +74,7 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
         s_g_is = var_SVRG(ob, ac, rw,iw_var)
         s_g_fv_is.append(unpack(s_g_is))
         w_cum+=np.sum(dis_iw(iw_var))
+    w_cum = M
     var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
     var_batch = var_sgd/(M)
     var_is_sgd = np.cov(s_g_fv_is,rowvar=False)
@@ -87,7 +88,7 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
     for i in range(l):
       cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
     cov = cov/(l*np.sqrt(M*w_cum))
-    var_svrg = var_fg + var_is + var_batch + cov
+    var_svrg =  var_is + var_batch + cov # + var_fg
     return var_svrg,var_batch
 
  
@@ -129,7 +130,7 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.00005
+learning_rate = 0.01
 #perc estimate
 perc_est = 0.6
 #tot trajectories
@@ -187,7 +188,7 @@ f_train = theano.function(
 f_update = theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
     outputs = None,
-    updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 f_importance_weights = theano.function(
     inputs = [observations_var, actions_var],
@@ -199,7 +200,7 @@ f_importance_weights = theano.function(
 f_update_SVRG = theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
     outputs = None,
-    updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
 )
 
 
@@ -255,6 +256,7 @@ for k in range(10):
     while j<s_tot-N:
         paths = parallel_sampler.sample_paths_on_trajectories(snap_policy.get_param_values(),N,T,show_bar=False)
         #baseline.fit(paths)
+        paths = paths[:N]
         j+=N
         observations = [p["observations"] for p in paths]
         actions = [p["actions"] for p in paths]
@@ -295,6 +297,7 @@ for k in range(10):
             j += M
             sub_paths = parallel_sampler.sample_paths_on_trajectories(snap_policy.get_param_values(),M,T,show_bar=False)
             #baseline.fit(paths)
+            sub_paths = sub_paths[:M]
             sub_observations=[p["observations"] for p in sub_paths]
             sub_actions = [p["actions"] for p in sub_paths]
             sub_d_rewards = [p["rewards"] for p in sub_paths]
@@ -313,6 +316,10 @@ for k in range(10):
             var_svrg,var_batch=estimate_SVRG_and_SGD_var(sub_ob_acc,sub_ac_acc,sub_d_rew_acc,full_g_variance)
             var_dif = var_svrg-var_batch
 
+            s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
+            s_p = s_p[:M]
+            rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
+            avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
             #eigval = np.real(np.linalg.eig(var_dif)[0])
             if (np.trace(var_dif)>0):
                 policy.set_param_values(back_up_policy.get_param_values(trainable=True), trainable=True)
@@ -336,16 +343,15 @@ for k in range(10):
                 importance_weights.append(np.mean(iw))
                 g_is = [sum(x) for x in zip(g_is,f_train_imp(ob,ac,rw,iw))]
                 g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw))]
+            iw_cum = M
             g = [x/len(sub_paths) for x in g]
             g_is = [x/iw_cum for x in g_is]
             g_d = [sum(x) for x in zip(g_is,g,s_g)]  
             f_update(g_d[0],g_d[1],g_d[2],g_d[3])
 
             p=snap_policy.get_param_values(trainable=True)
-            s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),10,T,show_bar=False)
             snap_policy.set_param_values(p,trainable=True)
-            rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
-            avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
+
             #print(str(j)+' Average Return:', avg_return[j])
         n_sub_iter.append(n_sub)
         snap_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True)    

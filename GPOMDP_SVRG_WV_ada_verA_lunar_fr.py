@@ -52,7 +52,7 @@ N = 100
 # Each trajectory will have at most 100 time steps
 T = 1000
 #We will collect M secondary trajectories
-M = 10
+M = 20
 #Number of sub-iterations
 #m_itr = 100
 # Number of iterations
@@ -136,7 +136,7 @@ importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
 n_sub_iter_data={}
-parallel_sampler.initialize(2)
+parallel_sampler.initialize(4)
 for k in range(10):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)

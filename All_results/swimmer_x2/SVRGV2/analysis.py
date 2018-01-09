@@ -25,9 +25,9 @@ for col_name_s,col_name_si,col_name_nsi in zip(rewards_snapshot,rewards_subiter,
     ranges = n_sub_iter[col_name_nsi][~np.isnan(n_sub_iter[col_name_nsi])]
     traj_rewards = list()
     for i,k,s in zip(first[0:-1],ranges,range(len(ranges))):
-        traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split()))
+        traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split())[:100])
         for j in range(np.int(k)):
-            traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split()))
+            traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split())[:10])
     if(len(ranges)<len(rewards_snapshot[col_name_s][rewards_snapshot[col_name_s]==rewards_snapshot[col_name_s]])):
         traj_rewards.append(list(rewards_snapshot[col_name_s][np.int(s+1)][1:-1].split()))
     traj_rewards=flatten(traj_rewards)
@@ -94,9 +94,9 @@ for col_name_s,col_name_si,col_name_nsi in zip(rewards_snapshot,rewards_subiter,
     ranges = n_sub_iter[col_name_nsi][~np.isnan(n_sub_iter[col_name_nsi])]
     traj_rewards = list()
     for i,k,s in zip(first[0:-1],ranges,range(len(ranges))):
-        traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split()))
+        traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split())[:100])
         for j in range(np.int(k)):
-            traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split()))
+            traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split())[:10])
     if(len(ranges)<len(rewards_snapshot[col_name_s][rewards_snapshot[col_name_s]==rewards_snapshot[col_name_s]])):
         traj_rewards.append(list(rewards_snapshot[col_name_s][np.int(s+1)][1:-1].split()))
     traj_rewards=flatten(traj_rewards)

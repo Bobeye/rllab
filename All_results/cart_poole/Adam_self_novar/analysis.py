@@ -12,7 +12,7 @@ rewards_subiter=pd.read_csv("rewards_subiter_v2.csv")
 variance_sgd=pd.read_csv("variance_sgd_v2.csv")
 variance_svrg=pd.read_csv("variance_svrg_v2.csv")
 importance_weights=pd.read_csv("importance_weights_v2.csv")
-gpomdp_rewards=pd.read_csv("GPOMDP_rewards.csv")
+gpomdp_rewards=pd.read_csv("GPOMDP_rewards_adam.csv")
 
 #analize
 #x=rewards_snapshot["rewardsSnapshot0"] np.array(x[0][1:-1].split()) crea un array contenete i rewards nel primo snapshot
@@ -25,9 +25,9 @@ for col_name_s,col_name_si,col_name_nsi in zip(rewards_snapshot,rewards_subiter,
 	ranges = n_sub_iter[col_name_nsi][~np.isnan(n_sub_iter[col_name_nsi])]
 	traj_rewards = list()
 	for i,k,s in zip(first[0:-1],ranges,range(len(ranges))):
-		traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split()))
+		traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split())[:100])
 		for j in range(np.int(k)):
-			traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split()))
+			traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split())[:10])
 	if(len(ranges)<len(rewards_snapshot[col_name_s][rewards_snapshot[col_name_s]==rewards_snapshot[col_name_s]])):
 		traj_rewards.append(list(rewards_snapshot[col_name_s][np.int(s+1)][1:-1].split()))
 	traj_rewards=flatten(traj_rewards)
@@ -79,35 +79,35 @@ plt.show()
 
 reward=list()
 for col in gpomdp_rewards:
-	x=gpomdp_rewards[col][gpomdp_rewards[col]==gpomdp_rewards[col]]
-	rew=list()
-	for i in x: 
-		rew.append(list(i[1:-1].split()))
-	reward.append(flatten(rew[0:500])+flatten(rew[500:]))
+    x=gpomdp_rewards[col][gpomdp_rewards[col]==gpomdp_rewards[col]]
+    rew=list()
+    for i in x: 
+        rew.append(list(i[1:-1].split()))
+    reward.append(flatten(rew[0:500])+flatten(rew[500:]))
 reward=np.asarray(np.mean(np.matrix(reward,dtype=np.float64),axis=0)).flatten()
 plt.plot(reward)
 
 
 avg_traj_rewards=list()
-for col_name_s,col_name_si,col_name_nsi in zip(rewards_snapshot,rewards_subiter,n_sub_iter):	
-	first = np.insert(np.array(np.cumsum(n_sub_iter[col_name_nsi][~np.isnan(n_sub_iter[col_name_nsi])])),0,0) #np.cumsum(n_sub_iter["nSubIter0"][~np.isnan(n_sub_iter["nSubIter0"])])
-	ranges = n_sub_iter[col_name_nsi][~np.isnan(n_sub_iter[col_name_nsi])]
-	traj_rewards = list()
-	for i,k,s in zip(first[0:-1],ranges,range(len(ranges))):
-		traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split()))
-		for j in range(np.int(k)):
-			traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split()))
-	if(len(ranges)<len(rewards_snapshot[col_name_s][rewards_snapshot[col_name_s]==rewards_snapshot[col_name_s]])):
-		traj_rewards.append(list(rewards_snapshot[col_name_s][np.int(s+1)][1:-1].split()))
-	traj_rewards=flatten(traj_rewards)
-	avg_traj_rewards.append(traj_rewards)
+for col_name_s,col_name_si,col_name_nsi in zip(rewards_snapshot,rewards_subiter,n_sub_iter):    
+    first = np.insert(np.array(np.cumsum(n_sub_iter[col_name_nsi][~np.isnan(n_sub_iter[col_name_nsi])])),0,0) #np.cumsum(n_sub_iter["nSubIter0"][~np.isnan(n_sub_iter["nSubIter0"])])
+    ranges = n_sub_iter[col_name_nsi][~np.isnan(n_sub_iter[col_name_nsi])]
+    traj_rewards = list()
+    for i,k,s in zip(first[0:-1],ranges,range(len(ranges))):
+        traj_rewards.append(list(rewards_snapshot[col_name_s][s][1:-1].split())[:100])
+        for j in range(np.int(k)):
+            traj_rewards.append(list(rewards_subiter[col_name_si][i+j][1:-1].split())[:10])
+    if(len(ranges)<len(rewards_snapshot[col_name_s][rewards_snapshot[col_name_s]==rewards_snapshot[col_name_s]])):
+        traj_rewards.append(list(rewards_snapshot[col_name_s][np.int(s+1)][1:-1].split()))
+    traj_rewards=flatten(traj_rewards)
+    avg_traj_rewards.append(traj_rewards)
 lenghts=list()
 for i in avg_traj_rewards:
-	lenghts.append(len(i))
+    lenghts.append(len(i))
 min_len=min(lenghts)
 temp=list()
 for i in avg_traj_rewards:
-	temp.append(i[:min_len])
+    temp.append(i[:min_len])
 avg_traj_rewards=temp
 
 avg_traj_rewards=np.asarray(np.mean(np.matrix(avg_traj_rewards,dtype=np.float64),axis=0)).flatten()
@@ -116,7 +116,7 @@ plt.legend(["Average Reward SGD","Average Reward SVRG"],loc="lower right")
 plt.savefig("per_tra_comparison.jpg", figsize=(32, 24), dpi=160)
 plt.show()
 
-#per trajectory comparison
+#per trajectory comparison mean
 
 reward=list()
 for col in gpomdp_rewards:
