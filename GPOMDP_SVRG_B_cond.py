@@ -308,16 +308,12 @@ for k in range(10):
             n_sub+=1
             variance_svrg.append(np.trace(var_svrg))
             variance_sgd.append(np.trace(var_batch))
-            iw = f_importance_weights(sub_observations[0],sub_actions[0])
-            #iw[iw>1.5]=1.5
-            importance_weights.append(np.mean(iw))
-            #eigval = np.real(np.linalg.eig(var_dif)[0])
             if (np.trace(var_dif)>0):
                 policy.set_param_values(back_up_policy.get_param_values(trainable=True), trainable=True)
                 break
 
             
-
+            iw = f_importance_weights(sub_observations[0],sub_actions[0])
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
             
             g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],iw)

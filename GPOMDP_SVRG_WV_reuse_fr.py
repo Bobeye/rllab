@@ -249,11 +249,6 @@ for k in range(10):
 			var_svrg = (estimate_variance(observations[porz:],actions[porz:],d_rewards[porz:],b,N-porz,porz,partition,M,N))
 			var_dif = var_svrg-(np.diag(var_batch).sum())
 			#eigval = np.real(np.linalg.eig(var_dif)[0])
-			if (var_dif>0 or np.mean(iw_var)<0.6):
-				policy.set_param_values(back_up_policy.get_param_values(trainable=True), trainable=True)
-				break
-			variance_svrg.append(var_svrg)
-			variance_sgd.append((np.diag(var_batch).sum()))
 
 			n_sub+=1
 			sub_paths = random.sample(paths, M)
@@ -272,6 +267,10 @@ for k in range(10):
 			sub_d_rewards = temp
 			iw = f_importance_weights(sub_observations[0],sub_actions[0])
 			importance_weights.append(np.mean(iw))
+			if (var_dif>0 or np.mean(iw_var)<0.6):
+				policy.set_param_values(back_up_policy.get_param_values(trainable=True), trainable=True)
+				break
+
 			back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
 			
 			g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],iw)
