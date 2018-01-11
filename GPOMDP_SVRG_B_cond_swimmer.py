@@ -76,7 +76,7 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
         w_cum+=np.sum(dis_iw(iw_var))
         s_g_is = var_SVRG(ob, ac, rw,iw_var)
         s_g_fv_is.append(unpack(s_g_is))
-    w_cum = M
+#    w_cum = M
     var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
     var_batch = var_sgd/(M)
     var_is_sgd = np.cov(s_g_fv_is,rowvar=False)
@@ -346,7 +346,7 @@ for k in range(10):
                 importance_weights.append(np.mean(iw))
                 g_is = [sum(x) for x in zip(g_is,f_train_imp(ob,ac,rw,iw))]
                 g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw))]
-            iw_cum = M
+#            iw_cum = M
             g = [x/len(sub_paths) for x in g]
             g_is = [x/iw_cum for x in g_is]
             g_d = [sum(x) for x in zip(g_is,g,s_g)]  

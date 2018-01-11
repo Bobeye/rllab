@@ -91,6 +91,8 @@ perc_est = 0.6
 #tot trajectories
 s_tot = 10000
 
+cost=1.2
+
 partition = 3
 
 
@@ -263,7 +265,7 @@ for k in range(10):
             sub_ac_acc+=sub_actions
             sub_d_rew_acc+=sub_d_rewards
             var_svrg,var_batch=estimate_SVRG_and_SGD_var(sub_ob_acc,sub_ac_acc,sub_d_rew_acc,full_g_variance)
-            var_dif = var_svrg-var_batch
+            var_dif = var_svrg-cost*var_batch
             
             variance_svrg.append(np.trace(var_svrg))
             variance_sgd.append(np.trace(var_batch))

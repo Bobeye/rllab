@@ -88,7 +88,11 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
     for i in range(l):
       cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
     cov = cov/(l*np.sqrt(M*w_cum))
-    var_svrg =  var_is + var_batch + cov # + var_fg
+    var_svrg =  var_is + var_batch + cov + var_fg
+#    print("w:",w_cum)
+#    print("var is:",np.trace(var_is))
+#    print("cov:",np.trace(cov))
+#    print("var fg:",np.trace(var_fg))
     return var_svrg,var_batch
 
  
@@ -135,7 +139,8 @@ learning_rate = 0.01
 perc_est = 0.6
 #tot trajectories
 s_tot = 10000
-
+#cost of resample
+cost = 1.2
 partition = 3
 
 
@@ -314,7 +319,7 @@ for k in range(10):
             sub_ac_acc+=sub_actions
             sub_d_rew_acc+=sub_d_rewards
             var_svrg,var_batch=estimate_SVRG_and_SGD_var(sub_ob_acc,sub_ac_acc,sub_d_rew_acc,full_g_variance)
-            var_dif = var_svrg-var_batch
+            var_dif = var_svrg-cost*var_batch
 
             s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
             s_p = s_p[:M]

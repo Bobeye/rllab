@@ -77,7 +77,7 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
         w_cum+=np.sum(dis_iw(iw_var))
         s_g_is = var_SVRG(ob, ac, rw,iw_var)
         s_g_fv_is.append(unpack(s_g_is))
-    w_cum = M
+#    w_cum = M
     var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
     var_batch = var_sgd/(M)
     var_is_sgd = np.cov(s_g_fv_is,rowvar=False)
@@ -91,7 +91,7 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
     for i in range(l):
       cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
     cov = cov/(l*np.sqrt(M*w_cum))
-    var_svrg = var_fg + var_is + var_batch + cov
+    var_svrg =  var_is + var_batch + cov #+ var_fg 
     return var_svrg,var_batch
 
     
@@ -243,7 +243,7 @@ importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
 n_sub_iter_data={}
-parallel_sampler.initialize(15)
+parallel_sampler.initialize(8)
 for k in range(10):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
@@ -347,7 +347,7 @@ for k in range(10):
                 importance_weights.append(np.mean(iw))
                 g_is = [sum(x) for x in zip(g_is,f_train_imp(ob,ac,rw,iw))]
                 g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw))]
-            iw_cum = M
+#            iw_cum = M
             g = [x/len(sub_paths) for x in g]
             g_is = [x/iw_cum for x in g_is]
             g_d = [sum(x) for x in zip(g_is,g,s_g)]  
@@ -377,10 +377,10 @@ variance_svrg_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_sv
 importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in importance_weights_data.items() ]))
 
 
-rewards_subiter_data.to_csv("rewards_subiter_swimmer_vB.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vB.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_swimmer_vB.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_vB_swimmer.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_vB_swimmer.csv",index=False)
-importance_weights_data.to_csv("importance_weights_vB_swimmer.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_swimmer_vB_r.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vB_r.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_swimmer_vB_r.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_vB_swimmer_r.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_vB_swimmer_r.csv",index=False)
+importance_weights_data.to_csv("importance_weights_vB_swimmer_r.csv",index=False)
 
