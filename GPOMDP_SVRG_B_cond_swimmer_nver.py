@@ -233,7 +233,7 @@ grad_SVRG_4v = [sum(x) for x in zip(theano.grad(surr_on1,params),theano.grad(sur
 grad_imp = theano.grad(surr_on1,params)
 grad_var = theano.grad(surr_on1,params)
 
-update,step,vect_a =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], params, learning_rate=learning_rate)
+update,step =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], params, learning_rate=learning_rate)
 
 
 f_train = theano.function(
@@ -243,7 +243,7 @@ f_train = theano.function(
 
 f_update = [theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
-    outputs = [step[n_sub_iter],vect_a[n_sub_iter]],
+    outputs = step[n_sub_iter],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(max_sub_iter)]
 
@@ -256,7 +256,7 @@ f_importance_weights = theano.function(
 
 f_update_SVRG = [theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
-    outputs = [step[n_sub_iter],vect_a[n_sub_iter]],
+    outputs = step[n_sub_iter],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(max_sub_iter)]
 
