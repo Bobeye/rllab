@@ -320,9 +320,10 @@ for k in range(10):
             sub_d_rew_acc+=sub_d_rewards
             var_svrg,var_batch=estimate_SVRG_and_SGD_var(sub_ob_acc,sub_ac_acc,sub_d_rew_acc,full_g_variance)
             var_dif = var_svrg-cost*var_batch
-
+            p=snap_policy.get_param_values(trainable=True)
             s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
             s_p = s_p[:M]
+            snap_policy.set_param_values(p,trainable=True)
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
             avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
             n_sub+=1
@@ -354,9 +355,6 @@ for k in range(10):
             g_is = [x/iw_cum for x in g_is]
             g_d = [sum(x) for x in zip(g_is,g,s_g)]  
             f_update(g_d[0],g_d[1],g_d[2],g_d[3])
-
-            p=snap_policy.get_param_values(trainable=True)
-            snap_policy.set_param_values(p,trainable=True)
 
             #print(str(j)+' Average Return:', avg_return[j])
         n_sub_iter.append(n_sub)

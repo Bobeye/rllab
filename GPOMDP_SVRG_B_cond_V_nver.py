@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from rllab.envs.gym_env import GymEnv
 import pandas as pd
 
+max_sub_iter = 30
+
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
     res = i_g_arr[0].reshape(i_g_arr[0].shape[0]*i_g_arr[0].shape[1])
@@ -17,43 +19,6 @@ def unpack(i_g):
     res = np.concatenate((res,i_g_arr[2][0]))
     res = np.concatenate((res,i_g_arr[3]))
     return res
-
-
-
-def compute_snap_batch(observations,actions,d_rewards,n_traj,n_part):
-    n=n_traj
-    i=0
-    svrg_snap=list()
-    while(n-np.int(n_traj/n_part)>=0):
-        n=n-np.int(n_traj/n_part)
-        s_g = f_train(observations[i], actions[i], d_rewards[i])
-        for s in range(i+1,i+np.int(n_traj/n_part)):
-            s_g = [sum(x) for x in zip(s_g,f_train(observations[s], actions[s], d_rewards[s]))]
-        s_g = [x/np.int(n_traj/n_part) for x in s_g]
-        i += np.int(n_traj/n_part)
-        svrg_snap.append(unpack(s_g))
-    return svrg_snap
-
-def estimate_variance(observations,actions,d_rewards,snap_grads,n_traj,n_traj_s,n_part,M,N):
-    n=n_traj
-    i=0
-    svrg=list()
-    j=0
-    while(n-np.int(n_traj/n_part)>=0):
-        n=n-np.int(n_traj/n_part)
-        iw = f_importance_weights(observations[i],actions[i])
-        x = unpack(f_train_SVRG_4v(observations[i],actions[i],d_rewards[i],iw))*np.sqrt(np.int(n_traj/n_part)/M)
-        g = snap_grads[j]*np.sqrt(np.int(n_traj_s/n_part)/N)+x
-        for s in range(i+1,i+np.int(n_traj/n_part)):
-            iw = f_importance_weights(observations[s],actions[s])
-            g_prov=unpack(f_train_SVRG_4v(observations[s],actions[s],d_rewards[s],iw))*np.sqrt(np.int(n_traj/n_part)/M)
-            g+=snap_grads[j]*np.sqrt(np.int((n_traj_s)/n_part)/N) + g_prov
-        g=g/n_traj*n_part
-        i+=np.int(n_traj/n_part)
-        j+=1
-        svrg.append(g)
-    return (np.diag(np.cov(np.matrix(svrg),rowvar=False)).sum())
-
 
 def estimate_full_gradient_var(data):
     var_4_fg = np.cov(data,rowvar=False)
@@ -75,6 +40,7 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
 
     var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
     var_batch = var_sgd/(M)
+
     var_is_sgd = np.cov(s_g_fv_is,rowvar=False)
     var_is = var_is_sgd/(M)
     m_is = np.mean(s_g_fv_is,axis=0)
@@ -97,9 +63,9 @@ load_policy=True
 env = normalize(CartpoleEnv())
 #env = GymEnv("InvertedPendulum-v1")
 # Initialize a neural network policy with a single hidden layer of 8 hidden units
-policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=False)
-snap_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=False)
-back_up_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=False)
+policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=True)
+snap_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=True)
+back_up_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=True)
 parallel_sampler.populate_task(env, snap_policy)
 
 # policy.distribution returns a distribution object under rllab.distributions. It contains many utilities for computing
@@ -126,6 +92,8 @@ learning_rate = 0.01
 perc_est = 0.6
 #tot trajectories
 s_tot = 10000
+
+cost=1.2
 
 partition = 3
 
@@ -162,11 +130,12 @@ eval_grad1 = TT.matrix('eval_grad0',dtype=grad[0].dtype)
 eval_grad2 = TT.vector('eval_grad1',dtype=grad[1].dtype)
 eval_grad3 = TT.col('eval_grad3',dtype=grad[2].dtype)
 eval_grad4 = TT.vector('eval_grad4',dtype=grad[3].dtype)
+eval_grad5 = TT.vector('eval_grad5',dtype=grad[4].dtype)
 
 
 surr_on1 = TT.sum(- dist.log_likelihood_sym_1traj_GPOMDP(actions_var,dist_info_vars)*d_rewards_var*importance_weights_var)
 surr_on2 = TT.sum(snap_dist.log_likelihood_sym_1traj_GPOMDP(actions_var,snap_dist_info_vars)*d_rewards_var)
-grad_SVRG =[sum(x) for x in zip([eval_grad1, eval_grad2, eval_grad3, eval_grad4], theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
+grad_SVRG =[sum(x) for x in zip([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5], theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
 grad_SVRG_4v = [sum(x) for x in zip(theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
 grad_var = theano.grad(surr_on1,params)
 
@@ -176,9 +145,9 @@ f_train = theano.function(
 )
 
 f_update = theano.function(
-    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5],
     outputs = None,
-    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5], params, learning_rate=learning_rate)
 )
 f_importance_weights = theano.function(
     inputs = [observations_var, actions_var],
@@ -188,15 +157,15 @@ f_importance_weights = theano.function(
 
 
 f_update_SVRG = theano.function(
-    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5],
     outputs = None,
-    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5], params, learning_rate=learning_rate)
 )
 
 
 
 f_train_SVRG = theano.function(
-    inputs=[observations_var, actions_var, d_rewards_var, eval_grad1, eval_grad2, eval_grad3, eval_grad4,importance_weights_var],
+    inputs=[observations_var, actions_var, d_rewards_var, eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,importance_weights_var],
     outputs=grad_SVRG,
 )
 
@@ -225,8 +194,8 @@ n_sub_iter_data={}
 parallel_sampler.initialize(3)
 for k in range(10):
     if (load_policy):
-        snap_policy.set_param_values(np.loadtxt('policy_novar.txt'), trainable=True)
-        policy.set_param_values(np.loadtxt('policy_novar.txt'), trainable=True)
+        snap_policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
+        policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
     avg_return = list()
     n_sub_iter=[]
     rewards_sub_iter=[]
@@ -261,10 +230,10 @@ for k in range(10):
             s_g_fv.append(unpack(i_g))
             s_g = [sum(x) for x in zip(s_g,i_g)]
         s_g = [x/len(paths) for x in s_g]
-
+        
         full_g_variance=estimate_full_gradient_var(s_g_fv)
 
-        f_update(s_g[0],s_g[1],s_g[2],s_g[3])
+        f_update(s_g[0],s_g[1],s_g[2],s_g[3],s_g[4])
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         avg_return.append(np.mean([sum(p["rewards"]) for p in paths]))
         
@@ -298,33 +267,35 @@ for k in range(10):
             sub_ac_acc+=sub_actions
             sub_d_rew_acc+=sub_d_rewards
             var_svrg,var_batch=estimate_SVRG_and_SGD_var(sub_ob_acc,sub_ac_acc,sub_d_rew_acc,full_g_variance)
-            var_dif = var_svrg-var_batch
+            var_dif = var_svrg-cost*var_batch
             
-            p=snap_policy.get_param_values(trainable=True)                       
-            s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
+            variance_svrg.append(np.trace(var_svrg))
+            variance_sgd.append(np.trace(var_batch))
+
+            #print(np.sum(eigval))
+            n_sub+=1
+            p=snap_policy.get_param_values(trainable=True)
+            s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),10,T,show_bar=False)
             s_p = s_p[:M]
             snap_policy.set_param_values(p,trainable=True) 
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
             avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
-            n_sub+=1
-            variance_svrg.append(np.trace(var_svrg))
-            variance_sgd.append(np.trace(var_batch))
-            if (np.trace(var_dif)>0):
+
+            #eigval = np.real(np.linalg.eig(var_dif)[0])
+            if (np.trace(var_dif)>0 ):
                 policy.set_param_values(back_up_policy.get_param_values(trainable=True), trainable=True)
                 break
 
-            
-            iw = f_importance_weights(sub_observations[0],sub_actions[0])
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
-            
-            g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],iw)
+            iw = f_importance_weights(sub_observations[0],sub_actions[0])
+            importance_weights.append(np.mean(iw))
+            g = f_train_SVRG(sub_observations[0],sub_actions[0],sub_d_rewards[0],s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],iw)
             for ob,ac,rw in zip(sub_observations[1:],sub_actions[1:],sub_d_rewards[1:]):
                 iw = f_importance_weights(ob,ac)
-                #iw[iw>1.5]=1.5
                 importance_weights.append(np.mean(iw))
-                g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],iw))]
+                g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],iw))]
             g = [x/len(sub_paths) for x in g]
-            f_update(g[0],g[1],g[2],g[3])
+            f_update(g[0],g[1],g[2],g[3],g[4])
 
             #print(str(j)+' Average Return:', avg_return[j])
         n_sub_iter.append(n_sub)
@@ -348,10 +319,9 @@ variance_sgd_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_sgd
 variance_svrg_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_svrg_data.items() ]))
 importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in importance_weights_data.items() ]))
 
-
-rewards_subiter_data.to_csv("rewards_subiter_adam.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_adam.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_adam1.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_adam.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_adam.csv",index=False)
-importance_weights_data.to_csv("importance_weights_adam.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_Adam_v_trunc.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_Adam_v_trunc.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_Adam_v_trunc.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_Adam_v_trunc.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_Adam_v_trunc.csv",index=False)
+importance_weights_data.to_csv("importance_weights_Adam_v_trunc.csv",index=False)

@@ -13,6 +13,8 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 
+max_sub_iter = 50
+
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
     res = i_g_arr[0].reshape(i_g_arr[0].shape[0]*i_g_arr[0].shape[1])
@@ -93,36 +95,43 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
     return var_svrg,var_batch
 
 
-def adam_svrg(loss_or_grads, params,n_sub, learning_rate=0.001, beta1=0.9,
+def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
          beta2=0.999, epsilon=1e-8):
     all_grads = get_or_compute_grads(loss_or_grads, params)
-    t_prev = theano.shared(utils.floatX(0.))
-    updates = OrderedDict()
-    updates_of = OrderedDict()
-
-    # Using theano constant to prevent upcasting of float32
-    one = TT.constant(1)
-
-    t = t_prev + 1
-    a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
-
-    for param, g_t in zip(params, all_grads):
-        value = param.get_value(borrow=True)
-        m_prev = theano.shared(np.zeros(value.shape, dtype=value.dtype),
-                               broadcastable=param.broadcastable)
-        v_prev = theano.shared(np.zeros(value.shape, dtype=value.dtype),
-                               broadcastable=param.broadcastable)
-
-        m_t = beta1*m_prev + (one-beta1)*g_t
-        v_t = beta2*v_prev + (one-beta2)*g_t**2
-        step = a_t*m_t/(TT.sqrt(v_t) + epsilon)
-
-        updates[m_prev,n_sub] = m_t
-        updates[v_prev,n_sub] = v_t
-        updates_of[param] = param - step
-
-    updates[t_prev,n_sub] = t
-    return updates_of
+    t_prev = []
+    updates = []
+    updates_of = []
+    grads_adam = []
+    for m_r in range(max_sub_iter):
+        t_prev.append(theano.shared(utils.floatX(0.)))
+        updates.append(OrderedDict())
+        grads_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
+        updates_of.append(OrderedDict())
+        # Using theano constant to prevent upcasting of float32
+        one = TT.constant(1)
+        t = t_prev[-1] + 1
+        a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
+        i = 0
+        for param, g_t in zip(params, all_grads):
+            value = param.get_value(borrow=True)
+            m_prev = theano.shared(np.zeros(value.shape, dtype=value.dtype),
+                                   broadcastable=param.broadcastable)
+            v_prev = theano.shared(np.zeros(value.shape, dtype=value.dtype),
+                                   broadcastable=param.broadcastable)
+    
+            m_t = beta1*m_prev + (one-beta1)*g_t
+            v_t = beta2*v_prev + (one-beta2)*g_t**2
+            step = a_t*m_t/(TT.sqrt(v_t) + epsilon)
+            eff_step = TT.norm(step) / TT.no(m_t)
+    
+            updates[-1][m_prev] = m_t
+            updates[-1][v_prev] = v_t
+            grads_adam[-1][i] = eff_step
+            updates_of[-1][param] = param - step
+            i+=1
+    
+        updates[-1][t_prev[-1],n_sub] = t
+    return updates_of,grads_adam
     
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
@@ -195,8 +204,7 @@ eval_grad1 = TT.matrix('eval_grad0',dtype=grad[0].dtype)
 eval_grad2 = TT.vector('eval_grad1',dtype=grad[1].dtype)
 eval_grad3 = TT.col('eval_grad3',dtype=grad[2].dtype)
 eval_grad4 = TT.vector('eval_grad4',dtype=grad[3].dtype)
-
-n_sub_iter = theano.shared(0)
+ 
 
 
 surr_on1 = TT.sum(- dist.log_likelihood_sym_1traj_GPOMDP(actions_var,dist_info_vars)*d_rewards_var*importance_weights_var)
@@ -205,28 +213,30 @@ grad_SVRG =[sum(x) for x in zip([eval_grad1, eval_grad2, eval_grad3, eval_grad4]
 grad_SVRG_4v = [sum(x) for x in zip(theano.grad(surr_on1,params),theano.grad(surr_on2,snap_params))]
 grad_var = theano.grad(surr_on1,params)
 
+update,step =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, learning_rate=learning_rate)
+
 f_train = theano.function(
     inputs = [observations_var, actions_var, d_rewards_var],
     outputs = grad
 )
 
-f_update = theano.function(
+f_update = [theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
-    outputs = None,
-    updates = adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params,n_sub_iter, learning_rate=learning_rate)
-)
+    outputs = step[n_sub_iter],
+    updates = update[n_sub_iter]
+) for n_sub_iter in range(max_sub_iter)]
+    
 f_importance_weights = theano.function(
     inputs = [observations_var, actions_var],
     outputs = importance_weights
 )
 
 
-
-f_update_SVRG = theano.function(
+f_update_SVRG = [theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4],
-    outputs = None,
-    updates = adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4], params, n_sub_iter,learning_rate=learning_rate)
-)
+    outputs = step[n_sub_iter],
+    updates = update[n_sub_iter]
+) for n_sub_iter in range(max_sub_iter)]
 
 
 
@@ -299,7 +309,9 @@ for k in range(10):
 
         full_g_variance=estimate_full_gradient_var(s_g_fv)
 
-        f_update(s_g[0],s_g[1],s_g[2],s_g[3])
+        stp_snp = f_update[0](s_g[0],s_g[1],s_g[2],s_g[3])
+        stp_snp_sum = np.sum(unpack(stp_snp))
+        print("step snapshot:", stp_snp_sum)
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         avg_return.append(np.mean([sum(p["rewards"]) for p in paths]))
         
@@ -335,18 +347,15 @@ for k in range(10):
             var_svrg,var_batch=estimate_SVRG_and_SGD_var(sub_ob_acc,sub_ac_acc,sub_d_rew_acc,full_g_variance)
             var_dif = var_svrg-var_batch
             
-                        
+            p=snap_policy.get_param_values(trainable=True)      
             s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
             s_p = s_p[:M]
+            snap_policy.set_param_values(p,trainable=True)  
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
             avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
             n_sub+=1
             variance_svrg.append(np.trace(var_svrg))
             variance_sgd.append(np.trace(var_batch))
-            if (np.trace(var_dif)>0):
-                policy.set_param_values(back_up_policy.get_param_values(trainable=True), trainable=True)
-                break
-
             
             iw = f_importance_weights(sub_observations[0],sub_actions[0])
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
@@ -358,11 +367,12 @@ for k in range(10):
                 importance_weights.append(np.mean(iw))
                 g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],iw))]
             g = [x/len(sub_paths) for x in g]
-            f_update(g[0],g[1],g[2],g[3])
-
-            p=snap_policy.get_param_values(trainable=True)
-
-            snap_policy.set_param_values(p,trainable=True)
+            stp = f_update[n_sub](g[0],g[1],g[2],g[3])
+            stp_sum = np.sum(unpack(stp))
+            print("step:",stp_sum)
+            if (stp_sum/M<stp_snp_sum/N or n_sub+1>= max_sub_iter):
+                
+                break
             #print(str(j)+' Average Return:', avg_return[j])
         n_sub_iter.append(n_sub)
         snap_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True)    

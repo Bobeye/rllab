@@ -272,9 +272,10 @@ for k in range(10):
 
             #print(np.sum(eigval))
             n_sub+=1
-            
+            p=snap_policy.get_param_values(trainable=True)
             s_p = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),10,T,show_bar=False)
             s_p = s_p[:M]
+            snap_policy.set_param_values(p,trainable=True)     
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in s_p]))
             avg_return.append(np.mean([sum(p["rewards"]) for p in s_p]))
 
@@ -294,8 +295,6 @@ for k in range(10):
             g = [x/len(sub_paths) for x in g]
             f_update(g[0],g[1],g[2],g[3],g[4])
 
-            p=snap_policy.get_param_values(trainable=True)
-            snap_policy.set_param_values(p,trainable=True)
             #print(str(j)+' Average Return:', avg_return[j])
         n_sub_iter.append(n_sub)
         snap_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True)    
