@@ -12,7 +12,7 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 
-max_sub_iter = 20
+max_sub_iter = 10
 
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
@@ -98,6 +98,7 @@ def estimate_SVRG_and_SGD_var(observations,actions,d_rewards,var_fg):
     return var_svrg,var_batch
 
 
+
 def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
          beta2=0.999, epsilon=1e-8):
     all_grads = get_or_compute_grads(loss_or_grads, params)
@@ -108,14 +109,16 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
     for m_r in range(max_sub_iter):
         t_prev.append(theano.shared(utils.floatX(0.)))
         updates.append(OrderedDict())
-        grads_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.matrix('eval_grad3'),
-                           TT.vector('eval_grad4'),TT.matrix('eval_grad5'),TT.vector('eval_grad5'),TT.vector('eval_grad5')])
+#        grads_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
+#        norm_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
         updates_of.append(OrderedDict())
         # Using theano constant to prevent upcasting of float32
         one = TT.constant(1)
         t = t_prev[-1] + 1
         a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
         i = 0
+        l = []
+        h = []
         for param, g_t in zip(params, all_grads):
             value = param.get_value(borrow=True)
             m_prev = theano.shared(np.zeros(value.shape, dtype=value.dtype),
@@ -126,15 +129,16 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             m_t = beta1*m_prev + (one-beta1)*g_t
             v_t = beta2*v_prev + (one-beta2)*g_t**2
             step = a_t*m_t/(TT.sqrt(v_t) + epsilon)
-            eff_step = TT.nlinalg.norm(step,None) / TT.nlinalg.norm(m_t,None)
-            #eff_step = TT.sum(a_t/(TT.sqrt(v_t) + epsilon))
+#            eff_step = TT.sum(TT.square(step,None))
+            h.append(TT.sum(TT.square(step)))
+            l.append(TT.sum(TT.square(m_t)))
             updates[-1][m_prev] = m_t
             updates[-1][v_prev] = v_t
-            grads_adam[-1][i] = eff_step
             updates_of[-1][param] = param - step
             i+=1
     
         updates[-1][t_prev[-1]] = t
+        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4]+h[5]+h[6])/(l[0]+l[1]+l[2]+l[3]+l[4]+l[5]+l[6])))
     return updates_of,grads_adam
 
     
@@ -229,7 +233,7 @@ grad_SVRG_4v = [sum(x) for x in zip(theano.grad(surr_on1,params),theano.grad(sur
 grad_imp = theano.grad(surr_on1,params)
 grad_var = theano.grad(surr_on1,params)
 
-update,step =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], params, learning_rate=learning_rate)
+update,step,vect_a =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], params, learning_rate=learning_rate)
 
 
 f_train = theano.function(
@@ -239,7 +243,7 @@ f_train = theano.function(
 
 f_update = [theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
-    outputs = step[n_sub_iter],
+    outputs = [step[n_sub_iter],vect_a[n_sub_iter]],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(max_sub_iter)]
 
@@ -252,7 +256,7 @@ f_importance_weights = theano.function(
 
 f_update_SVRG = [theano.function(
     inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
-    outputs = step[n_sub_iter],
+    outputs = [step[n_sub_iter],vect_a[n_sub_iter]],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(max_sub_iter)]
 

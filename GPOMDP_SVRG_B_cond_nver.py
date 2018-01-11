@@ -105,13 +105,16 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
     for m_r in range(max_sub_iter):
         t_prev.append(theano.shared(utils.floatX(0.)))
         updates.append(OrderedDict())
-        grads_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
+#        grads_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
+#        norm_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
         updates_of.append(OrderedDict())
         # Using theano constant to prevent upcasting of float32
         one = TT.constant(1)
         t = t_prev[-1] + 1
         a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
         i = 0
+        l = []
+        h = []
         for param, g_t in zip(params, all_grads):
             value = param.get_value(borrow=True)
             m_prev = theano.shared(np.zeros(value.shape, dtype=value.dtype),
@@ -122,15 +125,16 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             m_t = beta1*m_prev + (one-beta1)*g_t
             v_t = beta2*v_prev + (one-beta2)*g_t**2
             step = a_t*m_t/(TT.sqrt(v_t) + epsilon)
-            eff_step = TT.nlinalg.norm(step,None) / TT.nlinalg.norm(m_t,None)
-    
+#            eff_step = TT.sum(TT.square(step,None))
+            h.append(TT.sum(TT.square(step)))
+            l.append(TT.sum(TT.square(m_t)))
             updates[-1][m_prev] = m_t
             updates[-1][v_prev] = v_t
-            grads_adam[-1][i] = eff_step
             updates_of[-1][param] = param - step
             i+=1
     
         updates[-1][t_prev[-1]] = t
+        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3])/(l[0]+l[1]+l[2]+l[3])))
     return updates_of,grads_adam
     
 load_policy=True
@@ -309,7 +313,7 @@ for k in range(10):
 
         full_g_variance=estimate_full_gradient_var(s_g_fv)
 
-        stp_snp = np.sum(f_update[0](s_g[0],s_g[1],s_g[2],s_g[3]))
+        stp_snp = f_update[0](s_g[0],s_g[1],s_g[2],s_g[3])
         print("step snapshot:", stp_snp)
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         avg_return.append(np.mean([sum(p["rewards"]) for p in paths]))
@@ -366,7 +370,7 @@ for k in range(10):
                 importance_weights.append(np.mean(iw))
                 g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],iw))]
             g = [x/len(sub_paths) for x in g]
-            stp = np.sum(f_update[n_sub](g[0],g[1],g[2],g[3]))
+            stp = f_update[n_sub](g[0],g[1],g[2],g[3])
             print("step:",stp)
             if (stp/M<stp_snp/N or n_sub+1>= max_sub_iter):
                 break
