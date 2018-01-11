@@ -13,7 +13,7 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 
-max_sub_iter = 50
+max_sub_iter = 20
 
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
@@ -122,7 +122,7 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             m_t = beta1*m_prev + (one-beta1)*g_t
             v_t = beta2*v_prev + (one-beta2)*g_t**2
             step = a_t*m_t/(TT.sqrt(v_t) + epsilon)
-            eff_step = TT.norm(step) / TT.no(m_t)
+            eff_step = TT.nlinalg.norm(step,None) / TT.nlinalg.norm(m_t,None)
     
             updates[-1][m_prev] = m_t
             updates[-1][v_prev] = v_t
@@ -130,7 +130,7 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             updates_of[-1][param] = param - step
             i+=1
     
-        updates[-1][t_prev[-1],n_sub] = t
+        updates[-1][t_prev[-1]] = t
     return updates_of,grads_adam
     
 load_policy=True
@@ -309,9 +309,8 @@ for k in range(10):
 
         full_g_variance=estimate_full_gradient_var(s_g_fv)
 
-        stp_snp = f_update[0](s_g[0],s_g[1],s_g[2],s_g[3])
-        stp_snp_sum = np.sum(unpack(stp_snp))
-        print("step snapshot:", stp_snp_sum)
+        stp_snp = np.sum(f_update[0](s_g[0],s_g[1],s_g[2],s_g[3]))
+        print("step snapshot:", stp_snp)
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         avg_return.append(np.mean([sum(p["rewards"]) for p in paths]))
         
@@ -367,11 +366,9 @@ for k in range(10):
                 importance_weights.append(np.mean(iw))
                 g = [sum(x) for x in zip(g,f_train_SVRG(ob,ac,rw,s_g[0],s_g[1],s_g[2],s_g[3],iw))]
             g = [x/len(sub_paths) for x in g]
-            stp = f_update[n_sub](g[0],g[1],g[2],g[3])
-            stp_sum = np.sum(unpack(stp))
-            print("step:",stp_sum)
-            if (stp_sum/M<stp_snp_sum/N or n_sub+1>= max_sub_iter):
-                
+            stp = np.sum(f_update[n_sub](g[0],g[1],g[2],g[3]))
+            print("step:",stp)
+            if (stp/M<stp_snp/N or n_sub+1>= max_sub_iter):
                 break
             #print(str(j)+' Average Return:', avg_return[j])
         n_sub_iter.append(n_sub)
