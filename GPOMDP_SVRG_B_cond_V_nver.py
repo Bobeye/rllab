@@ -9,6 +9,7 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 import pandas as pd
+import random
 
 max_sub_iter = 20
 
@@ -71,7 +72,10 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
         # Using theano constant to prevent upcasting of float32
         one = TT.constant(1)
         t = t_prev[-1] + 1
-        a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
+        if (m_r==0):
+            a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
+        else:
+            a_t = learning_rate/2*TT.sqrt(one-beta2**t)/(one-beta1**t)
         i = 0
         l = []
         h = []
@@ -290,8 +294,9 @@ for k in range(10):
         sub_ac_acc=list()
         sub_d_rew_acc=list()
         while j<s_tot-M:
-            j += M
-            sub_paths = parallel_sampler.sample_paths_on_trajectories(snap_policy.get_param_values(),M,T,show_bar=False)
+#            j += M
+#            sub_paths = parallel_sampler.sample_paths_on_trajectories(snap_policy.get_param_values(),M,T,show_bar=False)
+            sub_paths = random.sample(paths, M)
             #baseline.fit(paths)
             sub_paths = sub_paths[:M]
             sub_observations=[p["observations"] for p in sub_paths]

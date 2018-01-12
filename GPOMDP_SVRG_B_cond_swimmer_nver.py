@@ -115,7 +115,10 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
         # Using theano constant to prevent upcasting of float32
         one = TT.constant(1)
         t = t_prev[-1] + 1
-        a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
+        if (m_r==0):
+            a_t = learning_rate*10*TT.sqrt(one-beta2**t)/(one-beta1**t)
+        else:
+            a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
         i = 0
         l = []
         h = []
@@ -140,6 +143,8 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
         updates[-1][t_prev[-1]] = t
         grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4]+h[5]+h[6])/(l[0]+l[1]+l[2]+l[3]+l[4]+l[5]+l[6])))
     return updates_of,grads_adam
+
+
 
     
 def dis_iw(iw):
