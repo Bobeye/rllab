@@ -52,7 +52,7 @@ N = 100
 # Each trajectory will have at most 100 time steps
 T = 1000
 #We will collect M secondary trajectories
-M = 20
+M = 10
 #Number of sub-iterations
 #m_itr = 100
 # Number of iterations
@@ -136,8 +136,10 @@ importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
 n_sub_iter_data={}
+var_is_list_data = {}
+cov_list_data = {}
 parallel_sampler.initialize(4)
-for k in range(10):
+for k in range(1):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
         policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
@@ -151,6 +153,9 @@ for k in range(10):
     importance_weights=[]
     variance_svrg = []
     variance_sgd = []
+    var_is_list = []
+    cov_list = []
+    
     j=0
     while j<s_tot-N:
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
@@ -236,6 +241,8 @@ for k in range(10):
             cov = cov/(M*np.sqrt(M*w_cum))
             var_svrg =  var_is + var_batch + cov
             var_dif = var_svrg-var_batch
+            var_is_list.append(var_is)
+            cov_list.append(cov)
             print("var is: " + str(np.trace(var_is)))
             print("cov: " + str(np.trace(cov)))
             iw = f_importance_weights(sub_observations[0],sub_actions[0])
@@ -263,6 +270,8 @@ for k in range(10):
     variance_sgd_data["variancceSgd"+str(k)] = variance_sgd
     variance_svrg_data["varianceSvrg"+str(k)]=variance_svrg
     importance_weights_data["importanceWeights"+str(k)] = importance_weights
+    var_is_list_data["varIs"+str(k)] = var_is_list
+    cov_list_data["cov"+str(k)] = cov_list
 
     avg_return=np.array(avg_return)
     #plt.plot(avg_return)
@@ -277,12 +286,16 @@ n_sub_iter_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in n_sub_iter_dat
 variance_sgd_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_sgd_data.items() ]))
 variance_svrg_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_svrg_data.items() ]))
 importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in importance_weights_data.items() ]))
+var_is_list_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in var_is_list_data.items() ]))
+cov_list_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in cov_list_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn2.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn2.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn2.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn2.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn2.csv",index=False)
-importance_weights_data.to_csv("importance_weights_vA_swimmer_sn2.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn3.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn3.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn3.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn3.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn3.csv",index=False)
+importance_weights_data.to_csv("importance_weights_vA_swimmer_sn3.csv",index=False)
+var_is_list_data.to_csv("var_is_sn3.csv",index=False)
+cov_list_data.to_csv("cov_sn3.csv",index=False)
 
-alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn2.csv",index=False)
+alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn3.csv",index=False)

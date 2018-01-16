@@ -116,9 +116,9 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
         one = TT.constant(1)
         t = t_prev[-1] + 1
         if (m_r==0):
-            a_t = learning_rate*10*TT.sqrt(one-beta2**t)/(one-beta1**t)
-        else:
             a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
+        else:
+            a_t = learning_rate/3*TT.sqrt(one-beta2**t)/(one-beta1**t)
         i = 0
         l = []
         h = []
