@@ -13,7 +13,7 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 
-max_sub_iter = 50
+max_sub_iter = 20
 
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
@@ -69,6 +69,13 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
         grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4])/(l[0]+l[1]+l[2]+l[3]+l[4])))
     return updates_of,grads_adam
     
+def dis_iw(iw):
+    z=list()
+    t=1
+    for y in iw:
+        z.append(y*t)
+        t*=discount
+    return np.array(z)
     
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
@@ -90,7 +97,7 @@ snap_dist = snap_policy.distribution
 # We will collect 100 trajectories per iteration
 N = 100
 # Each trajectory will have at most 100 time steps
-T = 100
+T = 500
 #We will collect M secondary trajectories
 M = 10
 #Number of sub-iterations
@@ -100,7 +107,8 @@ M = 10
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.01
+#learning_rate = 0.01
+learning_rate = 0.001
 
 s_tot = 10000
 
@@ -177,6 +185,7 @@ importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
 n_sub_iter_data={}
+parallel_sampler.initialize(4)
 for k in range(10):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
@@ -252,6 +261,7 @@ for k in range(10):
             iw_var = f_importance_weights(sub_observations[0], sub_actions[0])
             s_g_is = f_imp_SVRG(sub_observations[0], sub_actions[0], sub_d_rewards[0],iw_var)
             s_g_fv_is = [unpack(s_g_is)]
+            w_cum=np.sum(dis_iw(iw_var))
             for ob,ac,rw in zip(sub_observations[1:],sub_actions[1:],sub_d_rewards[1:]):
                 i_g_sgd = f_train(ob, ac, rw)
                 s_g_fv_sgd.append(unpack(i_g_sgd))
@@ -260,7 +270,9 @@ for k in range(10):
                 s_g_is_sgd = f_imp_SVRG(ob, ac, rw,iw_var)
                 s_g_fv_is.append(unpack(s_g_is_sgd))
                 s_g_is = [sum(x) for x in zip(s_g_is,s_g_is_sgd)] 
-            s_g_is = [x/len(sub_paths) for x in s_g_is]
+                w_cum+=np.sum(dis_iw(iw_var))
+            #w_cum=len(sub_paths)
+            s_g_is = [x/w_cum for x in s_g_is]
             s_g_sgd = [x/len(sub_paths) for x in s_g_sgd]
             var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
             var_batch = var_sgd/(M)

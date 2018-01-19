@@ -6,6 +6,7 @@ import theano
 import theano.tensor as TT
 from rllab.sampler import parallel_sampler
 from lasagne.updates import sgd
+from lasagne.updates import adam
 from rllab.misc import ext
 import pandas as pd
 
@@ -25,22 +26,22 @@ dist = policy.distribution
 # We will collect 100 trajectories per iteration
 N = 10
 # Each trajectory will have at most 100 time steps
-T = 100
+T = 500
 # Number of iterations
 n_itr = 1000
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.00005
+learning_rate = 0.001
 
 observations_var = env.observation_space.new_tensor_variable(
-	'observations',
-	# It should have 1 extra dimension since we want to represent a list of observations
-	extra_dims=1
+    'observations',
+    # It should have 1 extra dimension since we want to represent a list of observations
+    extra_dims=1
 )
 actions_var = env.action_space.new_tensor_variable(
-	'actions',
-	extra_dims=1
+    'actions',
+    extra_dims=1
 )
 d_rewards_var = TT.vector('d_rewards')
 # policy.dist_info_sym returns a dictionary, whose values are symbolic expressions for quantities related to the
@@ -60,45 +61,47 @@ eval_grad4 = TT.vector('eval_grad4',dtype=grad[3].dtype)
 eval_grad5 = TT.vector('eval_grad4',dtype=grad[4].dtype)
 
 f_train = theano.function(
-	inputs = [observations_var, actions_var, d_rewards_var],
-	outputs = grad
+    inputs = [observations_var, actions_var, d_rewards_var],
+    outputs = grad
 )
 f_update = theano.function(
-	inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4,eval_grad5],
-	outputs = None,
-	updates = sgd([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5], params, learning_rate=learning_rate)
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4,eval_grad5],
+    outputs = None,
+    updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5], params, learning_rate=learning_rate)
 )
 runs_rewards = {}
+parallel_sampler.initialize(4)
 for k in range(10):
-	if (load_policy):
-		policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
-	avg_return = np.zeros(n_itr)
-	rewards=[]
-	#np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
-	for j in range(n_itr):
-		paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
-		observations = [p["observations"] for p in paths]
-		actions = [p["actions"] for p in paths]
-		d_rewards = [p["rewards"] for p in paths]
-		rewards.append(np.array([sum(p["rewards"])for p in paths]))
-		temp = list()
-		for x in d_rewards:
-			z=list()
-			t=1
-			for y in x:
-				z.append(y*t)
-				t*=discount
-			temp.append(np.array(z))
-		d_rewards=temp
-		s_g = f_train(observations[0], actions[0], d_rewards[0])
-		for ob,ac,rw in zip(observations[1:],actions[1:],d_rewards[1:]):
-			s_g = [sum(x) for x in zip(s_g,f_train(ob, ac, rw))]
-		s_g = [x/len(paths) for x in s_g]
-		
-		f_update(s_g[0],s_g[1],s_g[2],s_g[3],s_g[4])
-		avg_return[j] = np.mean([sum(p["rewards"]) for p in paths])
-		if(j%10==0):
-			print(str(j)+' Average Return:', avg_return[j])
-	runs_rewards["trajReturn"+str(k)]=rewards
+    if (load_policy):
+        policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
+    avg_return = np.zeros(n_itr)
+    rewards=[]
+    #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
+    for j in range(n_itr):
+        paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
+        paths = paths[:N]
+        observations = [p["observations"] for p in paths]
+        actions = [p["actions"] for p in paths]
+        d_rewards = [p["rewards"] for p in paths]
+        rewards.append(np.array([sum(p["rewards"])for p in paths]))
+        temp = list()
+        for x in d_rewards:
+            z=list()
+            t=1
+            for y in x:
+                z.append(y*t)
+                t*=discount
+            temp.append(np.array(z))
+        d_rewards=temp
+        s_g = f_train(observations[0], actions[0], d_rewards[0])
+        for ob,ac,rw in zip(observations[1:],actions[1:],d_rewards[1:]):
+            s_g = [sum(x) for x in zip(s_g,f_train(ob, ac, rw))]
+        s_g = [x/len(paths) for x in s_g]
+        
+        f_update(s_g[0],s_g[1],s_g[2],s_g[3],s_g[4])
+        avg_return[j] = np.mean([sum(p["rewards"]) for p in paths])
+        if(j%10==0):
+            print(str(j)+' Average Return:', avg_return[j])
+    runs_rewards["trajReturn"+str(k)]=rewards
 runs_rewards = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in runs_rewards.items() ]))
-runs_rewards.to_csv("GPOMDP_AVAR_rewards.csv",index=False)
+runs_rewards.to_csv("GPOMDP_AVAR_rewards2.csv",index=False)
