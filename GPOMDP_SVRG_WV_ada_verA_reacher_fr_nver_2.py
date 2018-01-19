@@ -1,3 +1,5 @@
+from rllab.envs.box2d.cartpole_env import CartpoleEnv
+from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 from rllab.envs.normalized_env import normalize
 import numpy as np
@@ -13,7 +15,7 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 
-max_sub_iter = 20
+max_sub_iter = 30
 
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
@@ -54,7 +56,7 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
         else:
             beta2 = 0.9
-            a_t = learning_rate/2*TT.sqrt(one-beta2**t)/(one-beta1**t)
+            a_t = learning_rate/4*TT.sqrt(one-beta2**t)/(one-beta1**t)
         i = 0
         l = []
         h = []
@@ -83,7 +85,7 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
 # within the range [-1, 1] (only works for environments with continuous actions)
-env = normalize(GymEnv("Swimmer-v1"))
+env = normalize(GymEnv("InvertedPendulum-v1"))
 # Initialize a neural network policy with a single hidden layer of 8 hidden units
 policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
 snap_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
@@ -99,7 +101,7 @@ snap_dist = snap_policy.distribution
 # We will collect 100 trajectories per iteration
 N = 100
 # Each trajectory will have at most 100 time steps
-T = 500
+T = 1000
 #We will collect M secondary trajectories
 M = 10
 #Number of sub-iterations
@@ -107,7 +109,7 @@ M = 10
 # Number of iterations
 #n_itr = np.int(10000/(m_itr*M+N))
 # Set the discount factor for the problem
-discount = 0.99
+discount = 0.995
 # Learning rate for the gradient update
 #learning_rate = 0.00005
 learning_rate = 0.001
@@ -191,11 +193,11 @@ rewards_subiter_data={}
 n_sub_iter_data={}
 diff_lr_data = {}
 alfa_t_data = {}
-parallel_sampler.initialize(10)
+parallel_sampler.initialize(3)
 for k in range(10):
     if (load_policy):
-        snap_policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
-        policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
+        snap_policy.set_param_values(np.loadtxt('policy_ip.txt'), trainable=True)
+        policy.set_param_values(np.loadtxt('policy_ip.txt'), trainable=True)
     else:
         policy.set_param_values(snap_policy.get_param_values(trainable=True), trainable=True) 
     avg_return = []
@@ -296,6 +298,8 @@ for k in range(10):
             cov = cov/(M*np.sqrt(M*w_cum))
             var_svrg =  var_is + var_batch + cov
             var_dif = var_svrg-var_batch
+            print("var is: " + str(np.trace(var_is)))
+            print("cov: " + str(np.trace(cov)))
             iw = f_importance_weights(sub_observations[0],sub_actions[0])
             importance_weights.append(np.mean(iw))
             variance_svrg.append((np.diag(var_svrg).sum()))
@@ -341,13 +345,13 @@ importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in import
 diff_lr_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in diff_lr_data.items() ]))
 alfa_t_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alfa_t_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn7.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn7.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn7.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn7.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn7.csv",index=False)
-importance_weights_data.to_csv("importance_weights_vA_swimmer_sn7.csv",index=False)
-diff_lr_data.to_csv("diff_lr_sn7.csv")
-alfa_t_data.to_csv("alfa_t_sn7.csv")
+rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn2.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn2.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn2.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn2.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn2.csv",index=False)
+importance_weights_data.to_csv("importance_weights_vA_swimmer_sn2.csv",index=False)
+diff_lr_data.to_csv("diff_lr_sn2.csv")
+alfa_t_data.to_csv("alfa_t_sn2.csv")
 
-alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn7.csv",index=False)
+alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn2.csv",index=False)

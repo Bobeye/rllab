@@ -1,5 +1,7 @@
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 from rllab.envs.normalized_env import normalize
+from pykalman import KalmanFilter
+import scipy.stats
 import numpy as np
 import theano
 import theano.tensor as TT
@@ -12,6 +14,8 @@ import pandas as pd
 from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
+from scipy import linalg
+
 
 max_sub_iter = 20
 
@@ -35,6 +39,17 @@ def dis_iw(iw):
     return np.array(z)
 
 
+def log_multivariate_normal_density(X, means, covars):
+    """Log probability for full covariance matrices. """
+    mu = means    
+    cv_chol = covars
+    cv_log_det = np.log(cv_chol)
+    cv_sol = (X-mu)/cv_chol
+    log_prob = - .5 * ((cv_sol ** 2) + (np.log(2 * np.pi) + cv_log_det))
+
+    return log_prob
+
+
 def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
          beta2=0.999, epsilon=1e-8):
     all_grads = get_or_compute_grads(loss_or_grads, params)
@@ -42,8 +57,7 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
     updates = []
     updates_of = []
     grads_adam = []
-    for m_r in range(2):
-        
+    for m_r in range(2):        
         t_prev.append(theano.shared(utils.floatX(0.)))
         updates.append(OrderedDict())
         updates_of.append(OrderedDict())
@@ -99,7 +113,7 @@ snap_dist = snap_policy.distribution
 # We will collect 100 trajectories per iteration
 N = 100
 # Each trajectory will have at most 100 time steps
-T = 500
+T = 1000
 #We will collect M secondary trajectories
 M = 10
 #Number of sub-iterations
@@ -107,13 +121,13 @@ M = 10
 # Number of iterations
 #n_itr = np.int(10000/(m_itr*M+N))
 # Set the discount factor for the problem
-discount = 0.99
+discount = 0.995
 # Learning rate for the gradient update
 #learning_rate = 0.00005
 learning_rate = 0.001
 
 
-s_tot = 10000
+s_tot = 20000
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -209,6 +223,8 @@ for k in range(10):
     diff_lr = []
     alfa_t = []
     j=0
+    kf = KalmanFilter(1,1)
+    mean_kf,cov_kf = kf.filter(learning_rate/M)
     while j<s_tot-N:
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
         paths = paths[:N]
@@ -309,7 +325,11 @@ for k in range(10):
             print("step:",stp)
             diff_lr.append(stp/M-stp_snp/N)
             alfa_t.append(stp)
-            if (stp/M<stp_snp/N or n_sub+1>= max_sub_iter):
+            if (n_sub==1):
+                mean_kf, cov_kf = kf.filter(stp)
+            else:
+                mean_kf, cov_kf = kf.filter_update(mean_kf[-1], cov_kf[-1], stp)
+            if (stp/M<stp_snp/N or n_sub+1>= max_sub_iter or (mean_kf/M<stp_snp/N)):
                 break
         n_sub_iter.append(n_sub)
         snap_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True)    
@@ -341,13 +361,13 @@ importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in import
 diff_lr_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in diff_lr_data.items() ]))
 alfa_t_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alfa_t_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn7.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn7.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn7.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn7.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn7.csv",index=False)
-importance_weights_data.to_csv("importance_weights_vA_swimmer_sn7.csv",index=False)
-diff_lr_data.to_csv("diff_lr_sn7.csv")
-alfa_t_data.to_csv("alfa_t_sn7.csv")
+rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn2.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn2.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn2.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn2.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn2.csv",index=False)
+importance_weights_data.to_csv("importance_weights_vA_swimmer_sn2.csv",index=False)
+diff_lr_data.to_csv("diff_lr_sn2.csv")
+alfa_t_data.to_csv("alfa_t_sn2.csv")
 
-alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn7.csv",index=False)
+alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn2.csv",index=False)

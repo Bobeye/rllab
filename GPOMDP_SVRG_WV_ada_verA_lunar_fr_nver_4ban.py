@@ -1,3 +1,5 @@
+from rllab.envs.box2d.cartpole_env import CartpoleEnv
+from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 from rllab.envs.normalized_env import normalize
 import numpy as np
@@ -77,17 +79,17 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             i+=1
     
         updates[-1][t_prev[-1]] = t
-        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4]+h[5]+h[6])/(l[0]+l[1]+l[2]+l[3]+l[4]+l[5]+l[6])))
+        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4]+h[5]+h[6]+h[7]+h[8])/(l[0]+l[1]+l[2]+l[3]+l[4]+l[5]+l[6]+l[7]+l[8])))
     return updates_of,grads_adam
     
-load_policy=True
+load_policy=False
 # normalize() makes sure that the actions for the environment lies
 # within the range [-1, 1] (only works for environments with continuous actions)
 env = normalize(GymEnv("Swimmer-v1"))
 # Initialize a neural network policy with a single hidden layer of 8 hidden units
-policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
-snap_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
-back_up_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
+policy = GaussianMLPPolicy(env.spec, hidden_sizes=(100,50,25))
+snap_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(100,50,25))
+back_up_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(100,50,25))
 parallel_sampler.populate_task(env, policy)
 
 # policy.distribution returns a distribution object under rllab.distributions. It contains many utilities for computing
@@ -97,23 +99,23 @@ parallel_sampler.populate_task(env, policy)
 dist = policy.distribution
 snap_dist = snap_policy.distribution
 # We will collect 100 trajectories per iteration
-N = 100
+N = 500
 # Each trajectory will have at most 100 time steps
 T = 500
 #We will collect M secondary trajectories
-M = 10
+M = 100
 #Number of sub-iterations
 #m_itr = 100
 # Number of iterations
 #n_itr = np.int(10000/(m_itr*M+N))
 # Set the discount factor for the problem
-discount = 0.99
+discount = 0.995
 # Learning rate for the gradient update
 #learning_rate = 0.00005
-learning_rate = 0.001
+learning_rate = 0.01
 
 
-s_tot = 10000
+s_tot = 20000
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -145,15 +147,17 @@ eval_grad1 = TT.matrix('eval_grad0',dtype=grad[0].dtype)
 eval_grad2 = TT.vector('eval_grad1',dtype=grad[1].dtype)
 eval_grad3 = TT.matrix('eval_grad3',dtype=grad[2].dtype)
 eval_grad4 = TT.vector('eval_grad4',dtype=grad[3].dtype)
-eval_grad5 = TT.matrix('eval_grad5',dtype=grad[3].dtype)
-eval_grad6 = TT.vector('eval_grad5',dtype=grad[3].dtype)
-eval_grad7 = TT.vector('eval_grad5',dtype=grad[3].dtype)
+eval_grad5 = TT.matrix('eval_grad3',dtype=grad[2].dtype)
+eval_grad6 = TT.vector('eval_grad4',dtype=grad[3].dtype)
+eval_grad7 = TT.matrix('eval_grad3',dtype=grad[2].dtype)
+eval_grad8 = TT.vector('eval_grad4',dtype=grad[3].dtype)
+eval_grad9 = TT.vector('eval_grad4',dtype=grad[3].dtype)
 
 surr_on1 = TT.sum(dist.log_likelihood_sym_1traj_GPOMDP(actions_var,snap_dist_info_vars)*d_rewards_var*importance_weights_var)
 surr_on2 = TT.sum(-snap_dist.log_likelihood_sym_1traj_GPOMDP(actions_var,dist_info_vars)*d_rewards_var)
 grad_imp = theano.grad(surr_on1,snap_params)
 
-update,step =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], params, learning_rate=learning_rate)
+update,step =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5, eval_grad6, eval_grad7, eval_grad8, eval_grad9], params, learning_rate=learning_rate)
 
 f_train = theano.function(
     inputs = [observations_var, actions_var, d_rewards_var],
@@ -161,7 +165,7 @@ f_train = theano.function(
 )
 
 f_update = [theano.function(
-    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5, eval_grad6, eval_grad7, eval_grad8, eval_grad9],
     outputs = step[n_sub_iter],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(2)]
@@ -172,7 +176,7 @@ f_importance_weights = theano.function(
 )
 
 f_update_SVRG = [theano.function(
-    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5, eval_grad6, eval_grad7, eval_grad8, eval_grad9],
     outputs = step[n_sub_iter],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(2)]
@@ -192,7 +196,7 @@ n_sub_iter_data={}
 diff_lr_data = {}
 alfa_t_data = {}
 parallel_sampler.initialize(10)
-for k in range(10):
+for k in range(1):
     if (load_policy):
         snap_policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
         policy.set_param_values(np.loadtxt('policy_swimmer.txt'), trainable=True)
@@ -208,6 +212,7 @@ for k in range(10):
     variance_sgd = []
     diff_lr = []
     alfa_t = []
+    all_rew = []
     j=0
     while j<s_tot-N:
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
@@ -234,15 +239,15 @@ for k in range(10):
             s_g = [sum(x) for x in zip(s_g,i_g)]
         s_g = [x/len(paths) for x in s_g]
         
-        stp_snp = np.sum(f_update[0](s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6]))
+        stp_snp = np.sum(f_update[0](s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6],s_g[7],s_g[8]))
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         avg_return.append(np.mean([sum(p["rewards"]) for p in paths]))
     
         var_4_fg = np.cov(s_g_fv,rowvar=False)
         var_fg = var_4_fg/(N)
     
-        print(str(j-1)+' Snapshot! Average Return:', avg_return[-1])
-        print("step snapshot:", stp_snp)
+        all_rew.extend([sum(p["rewards"]) for p in paths])
+        print(str(j-1)+' Snapshot Average Return:', np.mean(all_rew))
         
         back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
         n_sub = 0
@@ -296,6 +301,8 @@ for k in range(10):
             cov = cov/(M*np.sqrt(M*w_cum))
             var_svrg =  var_is + var_batch + cov
             var_dif = var_svrg-var_batch
+            print("var is: " + str(np.trace(var_is)))
+            print("cov: " + str(np.trace(cov)))
             iw = f_importance_weights(sub_observations[0],sub_actions[0])
             importance_weights.append(np.mean(iw))
             variance_svrg.append((np.diag(var_svrg).sum()))
@@ -304,8 +311,9 @@ for k in range(10):
             avg_return.append(np.mean([sum(p["rewards"]) for p in sub_paths]))                 
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
             g = [sum(x) for x in zip(s_g_is,s_g_sgd,s_g)]  
-            print(str(j-1)+' Average Return:', avg_return[-1])
-            stp = np.sum(f_update[1](g[0],g[1],g[2],g[3],g[4],g[5],g[6]))
+            all_rew.extend([sum(p["rewards"]) for p in sub_paths])
+            print(str(j-1)+' Average Return:', np.mean(all_rew))
+            stp = np.sum(f_update[1](g[0],g[1],g[2],g[3],g[4],g[5],g[6],g[7],g[8]))
             print("step:",stp)
             diff_lr.append(stp/M-stp_snp/N)
             alfa_t.append(stp)
@@ -316,6 +324,7 @@ for k in range(10):
         
 #    plt.plot(avg_return)
 #    plt.show()
+    np.savetxt("allrew.txt",all_rew)
     rewards_subiter_data["rewardsSubIter"+str(k)]=rewards_sub_iter
     rewards_snapshot_data["rewardsSnapshot"+str(k)]= rewards_snapshot
     n_sub_iter_data["nSubIter"+str(k)]= n_sub_iter
@@ -341,13 +350,13 @@ importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in import
 diff_lr_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in diff_lr_data.items() ]))
 alfa_t_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alfa_t_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn7.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn7.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn7.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn7.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn7.csv",index=False)
-importance_weights_data.to_csv("importance_weights_vA_swimmer_sn7.csv",index=False)
-diff_lr_data.to_csv("diff_lr_sn7.csv")
-alfa_t_data.to_csv("alfa_t_sn7.csv")
+rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn2.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn2.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn2.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn2.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn2.csv",index=False)
+importance_weights_data.to_csv("importance_weights_vA_swimmer_sn2.csv",index=False)
+diff_lr_data.to_csv("diff_lr_sn2.csv")
+alfa_t_data.to_csv("alfa_t_sn2.csv")
 
-alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn7.csv",index=False)
+alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn2.csv",index=False)
