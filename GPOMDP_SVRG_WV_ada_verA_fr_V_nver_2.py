@@ -13,7 +13,7 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 
-max_sub_iter = 20
+max_sub_iter = 50
 
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
@@ -110,7 +110,7 @@ discount = 0.99
 #learning_rate = 0.01
 learning_rate = 0.001
 
-s_tot = 10000
+s_tot = 20000
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -188,8 +188,10 @@ n_sub_iter_data={}
 parallel_sampler.initialize(4)
 for k in range(10):
     if (load_policy):
-        snap_policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
-        policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
+#        snap_policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
+#        policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
+        snap_policy.set_param_values(np.loadtxt('pc' + np.str(k+1) + '.txt'), trainable=True)
+        policy.set_param_values(np.loadtxt('pc' + np.str(k+1) + '.txt'), trainable=True)
     else:
         policy.set_param_values(snap_policy.get_param_values(trainable=True), trainable=True) 
     avg_return = np.zeros(s_tot)

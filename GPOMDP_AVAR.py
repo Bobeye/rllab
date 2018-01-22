@@ -28,7 +28,7 @@ N = 10
 # Each trajectory will have at most 100 time steps
 T = 500
 # Number of iterations
-n_itr = 1000
+n_itr = 2000
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
@@ -73,7 +73,8 @@ runs_rewards = {}
 parallel_sampler.initialize(4)
 for k in range(10):
     if (load_policy):
-        policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
+#        policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
+        policy.set_param_values(np.loadtxt('pc' + np.str(k+1) + '.txt'), trainable=True)
     avg_return = np.zeros(n_itr)
     rewards=[]
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
