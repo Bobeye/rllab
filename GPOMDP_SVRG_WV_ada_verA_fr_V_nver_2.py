@@ -108,9 +108,9 @@ M = 10
 discount = 0.99
 # Learning rate for the gradient update
 #learning_rate = 0.01
-learning_rate = 0.001
+learning_rate = 0.005
 
-s_tot = 20000
+s_tot = 10000
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -185,6 +185,7 @@ importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
 n_sub_iter_data={}
+all_policy_param_data = {}
 parallel_sampler.initialize(4)
 for k in range(10):
     if (load_policy):
@@ -202,8 +203,10 @@ for k in range(10):
     importance_weights=[]
     variance_svrg = []
     variance_sgd = []
+    all_policy_param = []
     j=0
     while j<s_tot-N:
+        all_policy_param.append(policy.get_param_values())
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
         paths = paths[:N]
         #baseline.fit(paths)
@@ -227,20 +230,21 @@ for k in range(10):
             s_g_fv.append(unpack(i_g))
             s_g = [sum(x) for x in zip(s_g,i_g)]
         s_g = [x/len(paths) for x in s_g]
-        
         stp_snp = f_update[0](s_g[0],s_g[1],s_g[2],s_g[3],s_g[4])
+        
         print("step snapshot:", stp_snp)
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
         avg_return[j-N:j] = np.repeat(np.mean([sum(p["rewards"]) for p in paths]),N)
-    
         var_4_fg = np.cov(s_g_fv,rowvar=False)
         var_fg = var_4_fg/(N)
         
-        print(str(j-1)+' Average Return:', avg_return[j-1])
+        print(str(j)+' Average Return:', avg_return[j-1])
         
         back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
         n_sub = 0
         while j<s_tot-M:
+            if (j%100==0):
+                all_policy_param.append(policy.get_param_values())
             j += M
             sub_paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
             sub_paths[:M]
@@ -273,7 +277,7 @@ for k in range(10):
                 s_g_fv_is.append(unpack(s_g_is_sgd))
                 s_g_is = [sum(x) for x in zip(s_g_is,s_g_is_sgd)] 
                 w_cum+=np.sum(dis_iw(iw_var))
-            #w_cum=len(sub_paths)
+#            w_cum=len(sub_paths)
             s_g_is = [x/w_cum for x in s_g_is]
             s_g_sgd = [x/len(sub_paths) for x in s_g_sgd]
             var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
@@ -299,7 +303,6 @@ for k in range(10):
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
             g = [sum(x) for x in zip(s_g_is,s_g_sgd,s_g)]  
             stp = f_update[1](g[0],g[1],g[2],g[3],g[4])
-            print("step:",stp)
             if (stp/M<stp_snp/N or n_sub+1>= max_sub_iter):
                 break
         n_sub_iter.append(n_sub)
@@ -313,11 +316,14 @@ for k in range(10):
     variance_sgd_data["variancceSgd"+str(k)] = variance_sgd
     variance_svrg_data["varianceSvrg"+str(k)]=variance_svrg
     importance_weights_data["importanceWeights"+str(k)] = importance_weights
+    all_policy_param_data["policyParams"+str(k)] = all_policy_param
+    
 
     avg_return=np.array(avg_return)
     #plt.plot(avg_return)
     #plt.show()
     alla["avgReturn"+str(k)]=avg_return
+    print("Fine: ",str(k))
 
 alla = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alla.items() ]))
 rewards_subiter_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rewards_subiter_data.items() ]))
@@ -326,12 +332,12 @@ n_sub_iter_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in n_sub_iter_dat
 variance_sgd_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_sgd_data.items() ]))
 variance_svrg_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_svrg_data.items() ]))
 importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in importance_weights_data.items() ]))
+all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_v2_V.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_v2_V.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_v2_V.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_v2_V.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_v2_V.csv",index=False)
-importance_weights_data.to_csv("importance_weights_v2_V.csv",index=False)
-
-alla.to_csv("GPOMDP_SVRG_adaptive_m06_ver2_V.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_v2_Vsn.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_v2_Vsn.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_v2_Vsn.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_v2_Vsn.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_v2_Vsn.csv",index=False)
+importance_weights_data.to_csv("importance_weights_v2_Vsn.csv",index=False)
+all_policy_param_data.to_csv("param_policy_v2_Vsn.csv",index=False)

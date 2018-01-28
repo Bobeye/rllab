@@ -28,11 +28,11 @@ N = 10
 # Each trajectory will have at most 100 time steps
 T = 500
 # Number of iterations
-n_itr = 2000
+n_itr = 100
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.001
+learning_rate = 0.01
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -70,6 +70,7 @@ f_update = theano.function(
     updates = adam([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5], params, learning_rate=learning_rate)
 )
 runs_rewards = {}
+all_policy_param_data = {}
 parallel_sampler.initialize(4)
 for k in range(10):
     if (load_policy):
@@ -77,8 +78,11 @@ for k in range(10):
         policy.set_param_values(np.loadtxt('pc' + np.str(k+1) + '.txt'), trainable=True)
     avg_return = np.zeros(n_itr)
     rewards=[]
+    all_policy_param = []
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
     for j in range(n_itr):
+        if (j%100==0):
+                all_policy_param.append(policy.get_param_values())
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
         paths = paths[:N]
         observations = [p["observations"] for p in paths]
@@ -104,5 +108,8 @@ for k in range(10):
         if(j%10==0):
             print(str(j)+' Average Return:', avg_return[j])
     runs_rewards["trajReturn"+str(k)]=rewards
+    all_policy_param_data["policyParams"+str(k)] = all_policy_param
 runs_rewards = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in runs_rewards.items() ]))
-runs_rewards.to_csv("GPOMDP_AVAR_rewards2.csv",index=False)
+all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
+runs_rewards.to_csv("GPOMDP_AVAR_rewards500.csv",index=False)
+all_policy_param_data.to_csv("param_policy_GPOMDP500.csv",index=False)

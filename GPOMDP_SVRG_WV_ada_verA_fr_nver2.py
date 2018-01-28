@@ -232,7 +232,7 @@ for k in range(10):
         while j<s_tot-M:
             j += M
             sub_paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
-            sub_paths[:M]
+            sub_paths = sub_paths[:M]
             #baseline.fit(paths)
             sub_observations=[p["observations"] for p in sub_paths]
             sub_actions = [p["actions"] for p in sub_paths]
