@@ -26,13 +26,13 @@ dist = policy.distribution
 # We will collect 100 trajectories per iteration
 N = 10
 # Each trajectory will have at most 100 time steps
-T = 500
+T = 100
 # Number of iterations
-n_itr = 100
+n_itr = 1000
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.01
+learning_rate = 0.001
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -81,7 +81,7 @@ for k in range(10):
     all_policy_param = []
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
     for j in range(n_itr):
-        if (j%100==0):
+        if (j%10==0):
                 all_policy_param.append(policy.get_param_values())
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
         paths = paths[:N]
@@ -111,5 +111,5 @@ for k in range(10):
     all_policy_param_data["policyParams"+str(k)] = all_policy_param
 runs_rewards = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in runs_rewards.items() ]))
 all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
-runs_rewards.to_csv("GPOMDP_AVAR_rewards500.csv",index=False)
-all_policy_param_data.to_csv("param_policy_GPOMDP500.csv",index=False)
+runs_rewards.to_csv("GPOMDP_AVAR_rewards100.csv",index=False)
+all_policy_param_data.to_csv("param_policy_GPOMDP100.csv",index=False)
