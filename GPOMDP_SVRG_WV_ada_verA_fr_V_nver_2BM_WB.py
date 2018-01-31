@@ -67,7 +67,7 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             i+=1
     
         updates[-1][t_prev[-1]] = t
-        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4])/(l[0]+l[1]+l[2]+l[3]+l[4])))
+        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4]+h[5]+h[6]+h[7]+h[8])/(l[0]+l[1]+l[2]+l[3]+l[4]+l[5]+l[6]+l[7]+l[8])))
     return updates_of,grads_adam
     
 def dis_iw(iw):
@@ -102,7 +102,7 @@ N = 100
 # Each trajectory will have at most 100 time steps
 T = 500
 #We will collect M secondary trajectories
-M = 10
+M = 5
 #Number of sub-iterations
 #m_itr = 100
 # Number of iterations
@@ -113,7 +113,7 @@ discount = 0.99
 #learning_rate = 0.01
 learning_rate = 0.001
 
-learning_rate_b = 0.0000001
+#learning_rate_b = 0.0000001
 
 s_tot = 50000
 
@@ -286,7 +286,7 @@ for k in range(5):
         back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
         n_sub = 0
         while j<s_tot-M:
-            if (j%100==0):
+            if (j%100<M):
                 all_policy_param.append(policy.get_param_values())
             j += M
             sub_paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
@@ -334,23 +334,24 @@ for k in range(5):
                 path["advantages"] = za
                 path["returns"] = z_rew
                 p_4si.append(path)
-            old_param_b = baseline.get_param_values()
-            agg = list()
-            for i_b in range(len(p_4si)):
-                path = p_4si[i_b]
-                o = np.clip(path["observations"], -10, 10)
-                l = len(path["rewards"])
-                r = path["returns"]
-                al = np.arange(l).reshape(-1, 1) / 100.0
-                feat = np.concatenate([o, o ** 2, al, al ** 2, al ** 3, np.ones((l, 1))], axis=1)
-                pred = all_path_baseline[i_b][:-1]
-                err = np.array((r-pred))
-                agg.append(np.dot(err.T,feat))
-                #new_param_b = old_param_b + learning_rate_b *np.dot(err.T,feat)
-                #old_param_b = new_param_b
-            dir_bs = np.array([np.mean(x) for x in zip(*agg)])
-            new_param_b = old_param_b + learning_rate_b *dir_bs
-            baseline.set_param_values(new_param_b)            
+#            old_param_b = baseline.get_param_values()
+#            agg = list()
+#            for i_b in range(len(p_4si)):
+#                path = p_4si[i_b]
+#                o = np.clip(path["observations"], -10, 10)
+#                l = len(path["rewards"])
+#                r = path["returns"]
+#                al = np.arange(l).reshape(-1, 1) / 100.0
+#                feat = np.concatenate([o, o ** 2, al, al ** 2, al ** 3, np.ones((l, 1))], axis=1)
+#                pred = all_path_baseline[i_b][:-1]
+#                err = np.array((r-pred))
+#                agg.append(np.dot(err.T,feat))
+#                #new_param_b = old_param_b + learning_rate_b *np.dot(err.T,feat)
+#                #old_param_b = new_param_b
+#            dir_bs = np.array([np.mean(x) for x in zip(*agg)])
+#            new_param_b = old_param_b + learning_rate_b *dir_bs
+#            baseline.set_param_values(new_param_b)    
+            baseline.fit(p_4si)
             sub_d_rewards=tempa
             sub_d_rewards_sn = tempa_sn
             n_sub+=1
@@ -430,11 +431,11 @@ importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in import
 ar_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in ar_data.items() ]))
 all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_v2_Vb_bs2.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_v2_Vb_bs2.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_v2_Vb_bs2.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_v2_Vb_bs2.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_v2_Vb_bs2.csv",index=False)
-importance_weights_data.to_csv("importance_weights_v2_Vb_bs2.csv",index=False)
-ar_data.to_csv("ar_va_b_bs2.csv",index=False)
-all_policy_param_data.to_csv("param_policy_v2_Vb_bs2.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_r.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_r.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_r.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_r.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_r.csv",index=False)
+importance_weights_data.to_csv("importance_weights_r.csv",index=False)
+ar_data.to_csv("ar_va_b_r.csv",index=False)
+all_policy_param_data.to_csv("param_policy_r.csv",index=False)

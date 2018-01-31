@@ -14,6 +14,8 @@ from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
 
+np.set_printoptions(threshold = np.inf)
+
 max_sub_iter = 20
 
 def unpack(i_g):
@@ -195,7 +197,7 @@ n_sub_iter_data={}
 diff_lr_data = {}
 alfa_t_data = {}
 all_policy_param_data = {}
-parallel_sampler.initialize(10)
+parallel_sampler.initialize(7)
 for k in range(10):
     if (load_policy):
       #  snap_policy.set_param_values(np.loadtxt('policy_swimmer2.txt'), trainable=True)
@@ -259,7 +261,7 @@ for k in range(10):
                 all_policy_param.append(policy.get_param_values())
             j += M
             sub_paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
-            sub_paths[:M] = sub_paths[:M]
+            sub_paths = sub_paths[:M]
             #baseline.fit(paths)
             sub_observations=[p["observations"] for p in sub_paths]
             sub_actions = [p["actions"] for p in sub_paths]
@@ -353,13 +355,13 @@ diff_lr_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in diff_lr_data.item
 alfa_t_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alfa_t_data.items() ]))
 all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA_sn14.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA_sn14.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer_sn14.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_vA_swimmer_sn14.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_vA_swimmer_sn14.csv",index=False)
-importance_weights_data.to_csv("importance_weights_vA_swimmer_sn14.csv",index=False)
-diff_lr_data.to_csv("diff_lr_sn14.csv")
-alfa_t_data.to_csv("alfa_t_sn14.csv")
+rewards_subiter_data.to_csv("rewards_subiter_swimmer_vA.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_swimmer_vA.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_vA_swimmer.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_vA_swimmer.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_vA_swimmer.csv",index=False)
+importance_weights_data.to_csv("importance_weights_vA_swimmer.csv",index=False)
+diff_lr_data.to_csv("diff_lr.csv")
+alfa_t_data.to_csv("alfa_t.csv")
 all_policy_param_data.to_csv("param_policy_vA_swimmer.csv",index=False)
 

@@ -1,4 +1,4 @@
-from rllab.envs.box2d.cartpole_env import CartpoleEnv
+from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 from rllab.envs.normalized_env import normalize
 import numpy as np
@@ -6,12 +6,14 @@ import theano
 import theano.tensor as TT
 from rllab.sampler import parallel_sampler
 from lasagne.updates import sgd
+from lasagne.updates import adam
 import matplotlib.pyplot as plt
 from rllab.envs.gym_env import GymEnv
 import pandas as pd
 from lasagne.updates import get_or_compute_grads
 from lasagne import utils
 from collections import OrderedDict
+np.set_printoptions(threshold = np.inf)
 
 max_sub_iter = 20
 
@@ -19,9 +21,21 @@ def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
     res = i_g_arr[0].reshape(i_g_arr[0].shape[0]*i_g_arr[0].shape[1])
     res = np.concatenate((res,i_g_arr[1]))
-    res = np.concatenate((res,i_g_arr[2][0]))
+    res = i_g_arr[2].reshape(i_g_arr[2].shape[0]*i_g_arr[2].shape[1])
     res = np.concatenate((res,i_g_arr[3]))
+    res = np.concatenate((res,i_g_arr[4][0]))
+    res = np.concatenate((res,i_g_arr[5]))
+    res = np.concatenate((res,i_g_arr[6]))
     return res
+    
+def dis_iw(iw):
+    z=list()
+    t=1
+    for y in iw:
+        z.append(y*t)
+        t*=discount
+    return np.array(z)
+
 
 def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
          beta2=0.999, epsilon=1e-8):
@@ -31,10 +45,9 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
     updates_of = []
     grads_adam = []
     for m_r in range(2):
+        
         t_prev.append(theano.shared(utils.floatX(0.)))
         updates.append(OrderedDict())
-#        grads_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
-#        norm_adam.append([TT.matrix('eval_grad0'),TT.vector('eval_grad1'),TT.col('eval_grad3'),TT.vector('eval_grad4')])
         updates_of.append(OrderedDict())
         # Using theano constant to prevent upcasting of float32
         one = TT.constant(1)
@@ -42,7 +55,7 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
         if (m_r==0):
             a_t = learning_rate*TT.sqrt(one-beta2**t)/(one-beta1**t)
         else:
-            beta2 = 0.999
+            beta2 = 0.9
             a_t = learning_rate/2*TT.sqrt(one-beta2**t)/(one-beta1**t)
         i = 0
         l = []
@@ -66,28 +79,18 @@ def adam_svrg(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
             i+=1
     
         updates[-1][t_prev[-1]] = t
-        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4])/(l[0]+l[1]+l[2]+l[3]+l[4])))
+        grads_adam.append(TT.sqrt((h[0]+h[1]+h[2]+h[3]+h[4]+h[5]+h[6])/(l[0]+l[1]+l[2]+l[3]+l[4]+l[5]+l[6])))
     return updates_of,grads_adam
-    
-def dis_iw(iw):
-    z=list()
-    t=1
-    for y in iw:
-        z.append(y*t)
-        t*=discount
-    return np.array(z)
     
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
 # within the range [-1, 1] (only works for environments with continuous actions)
-env = normalize(CartpoleEnv())
-#env = GymEnv("InvertedPendulum-v1")
+env = normalize(HalfCheetahEnv())
 # Initialize a neural network policy with a single hidden layer of 8 hidden units
-policy = GaussianMLPPolicy(env.spec, hidden_sizes=(100,50,25))
-snap_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(100,50,25))
-back_up_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(100,50,25))
+policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
+snap_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
+back_up_policy = GaussianMLPPolicy(env.spec, hidden_sizes=(32,32))
 parallel_sampler.populate_task(env, policy)
-
 # policy.distribution returns a distribution object under rllab.distributions. It contains many utilities for computing
 # distribution-related quantities, given the computed dist_info_vars. Below we use dist.log_likelihood_sym to compute
 # the symbolic log-likelihood. For this example, the corresponding distribution is an instance of the class
@@ -99,7 +102,7 @@ N = 100
 # Each trajectory will have at most 100 time steps
 T = 500
 #We will collect M secondary trajectories
-M = 33
+M = 10
 #Number of sub-iterations
 #m_itr = 100
 # Number of iterations
@@ -107,10 +110,11 @@ M = 33
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-#learning_rate = 0.01
+#learning_rate = 0.00005
 learning_rate = 0.001
 
-s_tot = 50000
+
+s_tot = 10000
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -142,18 +146,15 @@ eval_grad1 = TT.matrix('eval_grad0',dtype=grad[0].dtype)
 eval_grad2 = TT.vector('eval_grad1',dtype=grad[1].dtype)
 eval_grad3 = TT.matrix('eval_grad3',dtype=grad[2].dtype)
 eval_grad4 = TT.vector('eval_grad4',dtype=grad[3].dtype)
-eval_grad5 = TT.matrix('eval_grad3',dtype=grad[2].dtype)
-eval_grad6 = TT.vector('eval_grad4',dtype=grad[3].dtype)
-eval_grad7 = TT.matrix('eval_grad3',dtype=grad[2].dtype)
-eval_grad8 = TT.vector('eval_grad4',dtype=grad[3].dtype)
-eval_grad9 = TT.vector('eval_grad4',dtype=grad[3].dtype)
+eval_grad5 = TT.matrix('eval_grad5',dtype=grad[3].dtype)
+eval_grad6 = TT.vector('eval_grad5',dtype=grad[3].dtype)
+eval_grad7 = TT.vector('eval_grad5',dtype=grad[3].dtype)
 
 surr_on1 = TT.sum(dist.log_likelihood_sym_1traj_GPOMDP(actions_var,snap_dist_info_vars)*d_rewards_var*importance_weights_var)
 surr_on2 = TT.sum(-snap_dist.log_likelihood_sym_1traj_GPOMDP(actions_var,dist_info_vars)*d_rewards_var)
 grad_imp = theano.grad(surr_on1,snap_params)
 
-update,step =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5, eval_grad6, eval_grad7, eval_grad8, eval_grad9], params, learning_rate=learning_rate)
-
+update,step =adam_svrg([eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7], params, learning_rate=learning_rate)
 
 f_train = theano.function(
     inputs = [observations_var, actions_var, d_rewards_var],
@@ -161,7 +162,7 @@ f_train = theano.function(
 )
 
 f_update = [theano.function(
-    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5, eval_grad6, eval_grad7, eval_grad8, eval_grad9],
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
     outputs = step[n_sub_iter],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(2)]
@@ -172,7 +173,7 @@ f_importance_weights = theano.function(
 )
 
 f_update_SVRG = [theano.function(
-    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5, eval_grad6, eval_grad7, eval_grad8, eval_grad9],
+    inputs = [eval_grad1, eval_grad2, eval_grad3, eval_grad4, eval_grad5,eval_grad6,eval_grad7],
     outputs = step[n_sub_iter],
     updates = update[n_sub_iter]
 ) for n_sub_iter in range(2)]
@@ -182,25 +183,29 @@ f_imp_SVRG = theano.function(
     outputs=grad_imp,
 )
 
+print(env.action_space)
+print(env.observation_space)
+
 alla = {}
 variance_svrg_data={}
 variance_sgd_data={}
 importance_weights_data={}
 rewards_snapshot_data={}
 rewards_subiter_data={}
-n_sub_iter_data={}
-ar_data = {}
 all_policy_param_data = {}
-parallel_sampler.initialize(4)
-for k in range(5):
+n_sub_iter_data={}
+diff_lr_data = {}
+alfa_t_data = {}
+parallel_sampler.initialize(10)
+for k in range(10):
     if (load_policy):
-#        snap_policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
-#        policy.set_param_values(np.loadtxt('policy.txt'), trainable=True)
-        snap_policy.set_param_values(np.loadtxt('pcb' + np.str(k+1) + '.txt'), trainable=True)
-        policy.set_param_values(np.loadtxt('pcb' + np.str(k+1) + '.txt'), trainable=True)
+#        snap_policy.set_param_values(np.loadtxt('half_policy.txt'), trainable=True)
+#        policy.set_param_values(np.loadtxt('half_policy.txt'), trainable=True)
+        snap_policy.set_param_values(np.loadtxt('phc' + np.str(k+1)  + '.txt'), trainable=True)
+        policy.set_param_values(np.loadtxt('phc' + np.str(k+1)  + '.txt'), trainable=True)
     else:
         policy.set_param_values(snap_policy.get_param_values(trainable=True), trainable=True) 
-    avg_return = np.zeros(s_tot)
+    avg_return = []
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
     n_sub_iter=[]
     rewards_sub_iter=[]
@@ -208,8 +213,9 @@ for k in range(5):
     importance_weights=[]
     variance_svrg = []
     variance_sgd = []
-    all_rew = []
+    diff_lr = []
     all_policy_param = []
+    alfa_t = []
     j=0
     while j<s_tot-N:
         all_policy_param.append(policy.get_param_values())
@@ -236,25 +242,25 @@ for k in range(5):
             s_g_fv.append(unpack(i_g))
             s_g = [sum(x) for x in zip(s_g,i_g)]
         s_g = [x/len(paths) for x in s_g]
-        stp_snp = f_update[0](s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6],s_g[7],s_g[8])
         
-        print("step snapshot:", stp_snp)
+        stp_snp = np.sum(f_update[0](s_g[0],s_g[1],s_g[2],s_g[3],s_g[4],s_g[5],s_g[6]))
         rewards_snapshot.append(np.array([sum(p["rewards"]) for p in paths])) 
-        avg_return[j-N:j] = np.repeat(np.mean([sum(p["rewards"]) for p in paths]),N)
+        avg_return.append(np.mean([sum(p["rewards"]) for p in paths]))
+    
         var_4_fg = np.cov(s_g_fv,rowvar=False)
         var_fg = var_4_fg/(N)
-        
-        all_rew.extend([sum(p["rewards"]) for p in paths])
-        print(str(j)+' Snapshot Average Return:', np.mean(all_rew))
+    
+        print(str(j-1)+' Snapshot! Average Return:', avg_return[-1])
+        print("step snapshot:", stp_snp)
         
         back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
         n_sub = 0
         while j<s_tot-M:
-            if ((j%100)<M):
+            if (j%100==0):
                 all_policy_param.append(policy.get_param_values())
             j += M
             sub_paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),M,T,show_bar=False)
-            sub_paths = sub_paths[:M]
+            sub_paths[:M] = sub_paths[:M]
             #baseline.fit(paths)
             sub_observations=[p["observations"] for p in sub_paths]
             sub_actions = [p["actions"] for p in sub_paths]
@@ -271,7 +277,7 @@ for k in range(5):
             n_sub+=1
             s_g_sgd = f_train(sub_observations[0], sub_actions[0], sub_d_rewards[0])
             s_g_fv_sgd = [unpack(s_g_sgd)]
-            iw_var = f_importance_weights(sub_observations[0], sub_actions[0])
+            iw_var = f_importance_weights(sub_observations[0], sub_actions[0]) 
             s_g_is = f_imp_SVRG(sub_observations[0], sub_actions[0], sub_d_rewards[0],iw_var)
             s_g_fv_is = [unpack(s_g_is)]
             w_cum=np.sum(dis_iw(iw_var))
@@ -284,13 +290,13 @@ for k in range(5):
                 s_g_fv_is.append(unpack(s_g_is_sgd))
                 s_g_is = [sum(x) for x in zip(s_g_is,s_g_is_sgd)] 
                 w_cum+=np.sum(dis_iw(iw_var))
-            w_cum=len(sub_paths)
-            s_g_is = [x/w_cum for x in s_g_is]
+#            print("w cum: " + str(w_cum))
+            s_g_is = [x/w_cum for x in s_g_is] 
             s_g_sgd = [x/len(sub_paths) for x in s_g_sgd]
             var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
             var_batch = var_sgd/(M)
             var_is_sgd = np.cov(s_g_fv_is,rowvar=False)
-            var_is = var_is_sgd/(M)
+            var_is = var_is_sgd/(w_cum)
             m_is = np.mean(s_g_fv_is,axis=0)
             m_sgd = np.mean(s_g_fv_sgd,axis=0)
             cov= np.outer(s_g_fv_is[0]-m_is,s_g_fv_sgd[0]-m_sgd)
@@ -298,41 +304,44 @@ for k in range(5):
               cov += np.outer(s_g_fv_is[i+1]-m_is,s_g_fv_sgd[i+1]-m_sgd)  
             for i in range(M):
               cov += np.outer(s_g_fv_sgd[i]-m_sgd,s_g_fv_is[i]-m_is)  
-            cov = cov/(M*M)
-            var_svrg = var_fg + var_is + var_batch + cov
+            cov = cov/(M*np.sqrt(M*w_cum))
+            var_svrg =  var_is + var_batch + cov
             var_dif = var_svrg-var_batch
             iw = f_importance_weights(sub_observations[0],sub_actions[0])
             importance_weights.append(np.mean(iw))
             variance_svrg.append((np.diag(var_svrg).sum()))
             variance_sgd.append((np.diag(var_batch).sum()))
-            all_rew.extend([sum(p["rewards"]) for p in sub_paths])
             rewards_sub_iter.append(np.array([sum(p["rewards"]) for p in sub_paths]))
-            avg_return[j-M:j] = np.repeat(np.mean([sum(p["rewards"]) for p in sub_paths]),M)                     
+            avg_return.append(np.mean([sum(p["rewards"]) for p in sub_paths]))                 
             back_up_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True) 
             g = [sum(x) for x in zip(s_g_is,s_g_sgd,s_g)]  
-            stp = f_update[1](g[0],g[1],g[2],g[3],g[4],g[5],g[6],g[7],g[8])
+            print(str(j-1)+' Average Return:', avg_return[-1])
+            stp = np.sum(f_update[1](g[0],g[1],g[2],g[3],g[4],g[5],g[6]))
+            print("step:",stp)
+            diff_lr.append(stp/M-stp_snp/N)
+            alfa_t.append(stp)
             if (stp/M<stp_snp/N or n_sub+1>= max_sub_iter):
                 break
         n_sub_iter.append(n_sub)
         snap_policy.set_param_values(policy.get_param_values(trainable=True), trainable=True)    
         
-    plt.plot(avg_return[::10])
-    plt.show()
+#    plt.plot(avg_return)
+#    plt.show()
     rewards_subiter_data["rewardsSubIter"+str(k)]=rewards_sub_iter
     rewards_snapshot_data["rewardsSnapshot"+str(k)]= rewards_snapshot
     n_sub_iter_data["nSubIter"+str(k)]= n_sub_iter
     variance_sgd_data["variancceSgd"+str(k)] = variance_sgd
     variance_svrg_data["varianceSvrg"+str(k)]=variance_svrg
     importance_weights_data["importanceWeights"+str(k)] = importance_weights
-    ar_data["mean"+str(k)] = np.mean(all_rew)
+    diff_lr_data["diffLr"+str(k)] = diff_lr
+    alfa_t_data["alfaT"+str(k)] = alfa_t
     all_policy_param_data["policyParams"+str(k)] = all_policy_param
-    
 
     avg_return=np.array(avg_return)
     #plt.plot(avg_return)
     #plt.show()
+    print('Fine sessione: ', str(k))
     alla["avgReturn"+str(k)]=avg_return
-    print("Fine: ",str(k))
 
 alla = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alla.items() ]))
 rewards_subiter_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rewards_subiter_data.items() ]))
@@ -341,14 +350,18 @@ n_sub_iter_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in n_sub_iter_dat
 variance_sgd_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_sgd_data.items() ]))
 variance_svrg_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in variance_svrg_data.items() ]))
 importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in importance_weights_data.items() ]))
-ar_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in ar_data.items() ]))
+diff_lr_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in diff_lr_data.items() ]))
+alfa_t_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in alfa_t_data.items() ]))
 all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_v2_Vb2.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_v2_Vb2.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_v2_Vb2.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_v2_Vb2.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_v2_Vb2.csv",index=False)
-importance_weights_data.to_csv("importance_weights_v2_Vb2.csv",index=False)
-ar_data.to_csv("ar_va_b2.csv",index=False)
-all_policy_param_data.to_csv("param_policy_v2_Vb2.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_hc.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_hc.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_hc.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_hc.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_hc.csv",index=False)
+importance_weights_data.to_csv("importance_weights_hc.csv",index=False)
+diff_lr_data.to_csv("diff_lr_hc.csv")
+alfa_t_data.to_csv("alfa_t_hc.csv")
+all_policy_param_data.to_csv("param_policy_hc.csv",index=False)
+
+alla.to_csv("GPOMDP_SVRG_adaptive_m06_verA_swimmer_sn5.csv",index=False)
