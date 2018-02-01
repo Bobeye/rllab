@@ -91,6 +91,7 @@ for k in range(10):
         if (j%10==0):
                 all_policy_param.append(policy.get_param_values())
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
+        paths = paths[:N]
         #baseline.fit(paths)
         observations = [p["observations"] for p in paths]
         actions = [p["actions"] for p in paths]

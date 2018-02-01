@@ -14,7 +14,7 @@ from lasagne import utils
 from collections import OrderedDict
 from rllab.baselines.linear_feature_baseline import LinearFeatureBaseline
 
-max_sub_iter = 10
+max_sub_iter = 3
 
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
@@ -102,7 +102,7 @@ N = 100
 # Each trajectory will have at most 100 time steps
 T = 500
 #We will collect M secondary trajectories
-M = 5
+M = 10
 #Number of sub-iterations
 #m_itr = 100
 # Number of iterations
@@ -351,7 +351,7 @@ for k in range(5):
 #            dir_bs = np.array([np.mean(x) for x in zip(*agg)])
 #            new_param_b = old_param_b + learning_rate_b *dir_bs
 #            baseline.set_param_values(new_param_b)    
-            baseline.fit(p_4si)
+#            baseline.fit(p_4si)
             sub_d_rewards=tempa
             sub_d_rewards_sn = tempa_sn
             n_sub+=1
@@ -431,11 +431,11 @@ importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in import
 ar_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in ar_data.items() ]))
 all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_r.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_r.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_r.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_r.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_r.csv",index=False)
-importance_weights_data.to_csv("importance_weights_r.csv",index=False)
-ar_data.to_csv("ar_va_b_r.csv",index=False)
-all_policy_param_data.to_csv("param_policy_r.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_r1.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_r1.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_r1.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_r1.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_r1.csv",index=False)
+importance_weights_data.to_csv("importance_weights_r1.csv",index=False)
+ar_data.to_csv("ar_va_b_r1.csv",index=False)
+all_policy_param_data.to_csv("param_policy_r1.csv",index=False)
