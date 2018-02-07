@@ -9,7 +9,7 @@ from lasagne.updates import sgd
 from lasagne.updates import adam
 from rllab.misc import ext
 import pandas as pd
-
+np.set_printoptions(threshold = np.inf)
 load_policy=True
 # normalize() makes sure that the actions for the environment lies
 # within the range [-1, 1] (only works for environments with continuous actions)
@@ -24,15 +24,15 @@ parallel_sampler.populate_task(env, policy)
 # rllab.distributions.DiagonalGaussian
 dist = policy.distribution
 # We will collect 100 trajectories per iteration
-N = 10
+N = 100
 # Each trajectory will have at most 100 time steps
 T = 100
 # Number of iterations
-n_itr = 1000
+n_itr = 100
 # Set the discount factor for the problem
 discount = 0.99
 # Learning rate for the gradient update
-learning_rate = 0.001
+learning_rate = 0.01
 
 observations_var = env.observation_space.new_tensor_variable(
     'observations',
@@ -81,8 +81,7 @@ for k in range(10):
     all_policy_param = []
     #np.savetxt("policy_novar.txt",snap_policy.get_param_values(trainable=True))
     for j in range(n_itr):
-        if (j%10==0):
-                all_policy_param.append(policy.get_param_values())
+        all_policy_param.append(policy.get_param_values())
         paths = parallel_sampler.sample_paths_on_trajectories(policy.get_param_values(),N,T,show_bar=False)
         paths = paths[:N]
         observations = [p["observations"] for p in paths]

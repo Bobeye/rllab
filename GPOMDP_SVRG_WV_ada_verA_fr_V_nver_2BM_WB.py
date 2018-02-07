@@ -14,7 +14,7 @@ from lasagne import utils
 from collections import OrderedDict
 from rllab.baselines.linear_feature_baseline import LinearFeatureBaseline
 
-max_sub_iter = 3
+max_sub_iter = 10
 
 def unpack(i_g):
     i_g_arr = [np.array(x) for x in i_g]
@@ -102,7 +102,7 @@ N = 100
 # Each trajectory will have at most 100 time steps
 T = 500
 #We will collect M secondary trajectories
-M = 10
+M = 20
 #Number of sub-iterations
 #m_itr = 100
 # Number of iterations
@@ -370,7 +370,7 @@ for k in range(5):
                 s_g_fv_is.append(unpack(s_g_is_sgd))
                 s_g_is = [sum(x) for x in zip(s_g_is,s_g_is_sgd)] 
                 w_cum+=np.sum(dis_iw(iw_var))
-            w_cum=len(sub_paths)
+#            w_cum=len(sub_paths)
             s_g_is = [x/w_cum for x in s_g_is]
             s_g_sgd = [x/len(sub_paths) for x in s_g_sgd]
             var_sgd = np.cov(s_g_fv_sgd,rowvar=False)
@@ -431,11 +431,11 @@ importance_weights_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in import
 ar_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in ar_data.items() ]))
 all_policy_param_data = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in all_policy_param_data.items() ]))
 
-rewards_subiter_data.to_csv("rewards_subiter_r1.csv",index=False)
-rewards_snapshot_data.to_csv("rewards_snapshot_r1.csv",index=False)
-n_sub_iter_data.to_csv("n_sub_iter_r1.csv",index=False)
-variance_sgd_data.to_csv("variance_sgd_r1.csv",index=False)
-variance_svrg_data.to_csv("variance_svrg_r1.csv",index=False)
-importance_weights_data.to_csv("importance_weights_r1.csv",index=False)
-ar_data.to_csv("ar_va_b_r1.csv",index=False)
-all_policy_param_data.to_csv("param_policy_r1.csv",index=False)
+rewards_subiter_data.to_csv("rewards_subiter_r0.csv",index=False)
+rewards_snapshot_data.to_csv("rewards_snapshot_r0.csv",index=False)
+n_sub_iter_data.to_csv("n_sub_iter_r0.csv",index=False)
+variance_sgd_data.to_csv("variance_sgd_r0.csv",index=False)
+variance_svrg_data.to_csv("variance_svrg_r0.csv",index=False)
+importance_weights_data.to_csv("importance_weights_r0.csv",index=False)
+ar_data.to_csv("ar_va_b_r0.csv",index=False)
+all_policy_param_data.to_csv("param_policy_r0.csv",index=False)

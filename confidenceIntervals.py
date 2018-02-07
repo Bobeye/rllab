@@ -13,17 +13,16 @@ env = normalize(CartpoleEnv())
 policy = GaussianMLPPolicy(env.spec, hidden_sizes=(8,),learn_std=True)
 
 parallel_sampler.populate_task(env, policy)
-parallel_sampler.initialize(8)
+parallel_sampler.initialize(4)
 
 T=100
 N=500
-file=["param_policy_GPOMDP500.csv","param_policy_v2_V.csv"]
-lab=["SVRPG","GPOMDP"]
+file=["param_policy_hc_sgd100.csv"]
+lab=["GPOMDP100"]
 plt.figure(figsize=(9,9))
 plt.title('Cart-Pole Task: SVRPG vs GPOMDP')
 plt.xlabel('Trajectories')
 plt.ylabel('Average Return')
-
 for f,l in zip(file,lab):
 	print("Processing file "+f+" ...")
 	rewards={}
